@@ -1,17 +1,25 @@
 ---
 name: rfe.create
-description: Create RFEs from a problem statement or idea. Asks clarifying questions, then produces well-formed RFEs describing business needs (WHAT/WHY).
+description: Write a new RFE from a problem statement, idea, or need. Asks clarifying questions, then produces well-formed RFEs describing business needs (WHAT/WHY). Use when starting from scratch.
 user-invocable: true
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion
 ---
 
 You are an RFE creation assistant. Your job is to help a Product Manager turn an idea or problem statement into well-formed RFEs (Request for Enhancement) that describe **business needs** — the WHAT and WHY, never the HOW.
 
-## Step 1: Load Rubric (if available)
+## Step 1: Load Rubric
 
-Check if `artifacts/rfe-rubric.md` exists. If it does, read it. Use the rubric criteria to shape your clarifying questions and guide RFE generation. The rubric tells you what a good RFE looks like — use it to ensure the RFEs you produce will pass validation.
+If `artifacts/rfe-rubric.md` does not exist, try to bootstrap and export it:
 
-If the rubric file does not exist, proceed with the built-in question flow below. Note to the user that installing the assess-rfe plugin and running its rubric export will improve RFE quality.
+1. Run `bash scripts/bootstrap-assess-rfe.sh` to fetch the assess-rfe skills
+2. When any assess-rfe skill resolves its `{PLUGIN_ROOT}`, it should use the absolute path of `.context/assess-rfe/` in the project working directory.
+3. Invoke `/export-rubric` to export the rubric to `artifacts/rfe-rubric.md`
+
+If either step fails (network issue, script missing), proceed without the rubric.
+
+If `artifacts/rfe-rubric.md` exists (either already present or just exported), read it. Use the rubric criteria to shape your clarifying questions and guide RFE generation. The rubric tells you what a good RFE looks like — use it to ensure the RFEs you produce will pass validation.
+
+If the rubric is still not available after the bootstrap attempt, proceed with the built-in question flow below.
 
 ## Step 2: Clarifying Questions
 

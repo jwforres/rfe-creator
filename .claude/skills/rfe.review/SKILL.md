@@ -51,11 +51,22 @@ Run two independent reviews. These assessments must remain separate — "this RF
 
 ### Review 1: Rubric Validation
 
-Check if the assess-rfe plugin is available by checking if `/assess-rfe:assess-rfe` can be invoked.
+<!-- TEMPORARY: This bootstrap approach clones assess-rfe from GitHub and copies
+     the skill locally because the Claude Agent SDK doesn't yet support marketplace
+     plugin resolution. Once the SDK or ambient runner adds plugin support, this
+     can be replaced with a direct /assess-rfe:assess-rfe plugin invocation. -->
 
-**If the plugin is available**: Invoke `/assess-rfe:assess-rfe` to score each RFE against the rubric. The plugin owns the scoring logic, criteria, and calibration. Do not reimplement or second-guess its scores.
+Bootstrap the assess-rfe skill by running:
 
-**If the plugin is NOT available**: Skip rubric validation. Note in the review report that rubric validation was skipped because the assess-rfe plugin is not installed. Perform a basic quality check instead:
+```bash
+bash scripts/bootstrap-assess-rfe.sh
+```
+
+This clones the assess-rfe repo into `.context/assess-rfe/` and copies the skill into `.claude/skills/assess-rfe/`. If the clone already exists, it reuses it.
+
+**If the bootstrap succeeded**: Invoke `/assess-rfe` to score each RFE against the rubric. When assess-rfe resolves its `{PLUGIN_ROOT}`, it should use the absolute path of `.context/assess-rfe/` in the project working directory. The plugin owns the scoring logic, criteria, and calibration. Do not reimplement or second-guess its scores.
+
+**If the bootstrap failed** (network issue, git unavailable): Skip rubric validation. Note in the review report that rubric validation was skipped because assess-rfe could not be fetched. Perform a basic quality check instead:
 - Does each RFE describe a business need (WHAT/WHY), not a task or technical activity?
 - Does each RFE avoid prescribing architecture, technology, or implementation?
 - Does each RFE name specific affected customers?

@@ -20,14 +20,94 @@ Check if `$ARGUMENTS` contains a Jira key (e.g., `RHAIRFE-1234`) or a local arti
 
 Also read `artifacts/rfe-review-report.md` if it exists — the right-sizing feedback explains why this RFE needs splitting.
 
+## Step 1.5: Load Right-sizing Rubric
+
+Bootstrap the assess-rfe skill if not already present:
+
+```bash
+bash scripts/bootstrap-assess-rfe.sh
+```
+
+Read the scoring rubric from `.context/assess-rfe/scripts/agent_prompt.md`. Find the **Right-sized** criterion and its calibration examples. This defines what "right-sized" means for the decomposition — use it to guide your split proposals and to verify each child RFE would score 2/2.
+
+The rubric's smell test for Right-sized is the key tool: apply it to each proposed child RFE. If a child RFE wouldn't pass the smell test, it needs further splitting or regrouping.
+
+If the bootstrap fails, proceed with a basic right-sizing heuristic: each child RFE should map to a single strategy feature — you should be able to write one strategy-feature summary sentence for it.
+
 ## Step 2: Analyze and Propose Split Options
 
-Read the RFE carefully. Identify the distinct business needs, capabilities, acceptance criteria, and user personas within it.
+### Step 2a: Triage Already-Delivered Capabilities
 
-Propose 2-3 decomposition strategies, each with:
+Before decomposing, check for capabilities that are already delivered or in progress. Sources:
+- The review report (`artifacts/rfe-review-report.md`) may flag delivered items
+- Stakeholder comments (`artifacts/rfe-tasks/RFE-NNN-comments.md`) often reveal what has shipped
+- Related strategy tickets mentioned in the RFE
+
+For each acceptance criterion and scope item, mark it as:
+- **Delivered**: Already shipped (cite the evidence — strategy ticket, comment, etc.)
+- **In progress**: Actively being worked under an existing strategy
+- **Gap**: Not yet addressed — candidate for a child RFE
+
+**Only gaps become candidates for child RFEs.** Delivered items should be acknowledged as background context in each child's problem statement. Do NOT re-request delivered capabilities as requirements in child RFEs.
+
+Present the triage table to the user before proceeding to decomposition.
+
+### Step 2b: Bottom-up Capability Inventory
+
+Starting from the **gaps only** (not delivered items), decompose into atomic capabilities. Do NOT start from the original RFE's thematic groupings — those groupings are often why the RFE is oversized in the first place.
+
+For each gap capability, ask:
+1. **Could this ship independently and deliver value to a specific customer?** If yes, it's a candidate for its own RFE.
+2. **Does this require another capability to function at all?** If yes, they must stay together.
+3. **Does this serve a different customer segment or compliance requirement than adjacent capabilities?** If yes, it should be its own RFE even if it's thematically similar.
+
+List every atomic capability with a one-sentence strategy-feature summary.
+
+**Common mistake to avoid:** Grouping capabilities by theme when each capability within the theme serves different customer segments, has different technical maturity, and can ship independently. Theme-based groupings produce children that are still bundles of multiple strategy features.
+
+### Step 2c: Propose Groupings
+
+Starting from the atomic capability list, group only capabilities that are truly inseparable — they share a code path AND cannot deliver value independently. Everything else stays separate.
+
+Then propose 2-3 decomposition strategies, each with:
 - How many RFEs it would produce
 - What each RFE would cover
+- A one-sentence strategy-feature summary for each child (applying the rubric's Right-sized smell test)
 - Brief rationale for why this decomposition makes sense
+
+**Self-check before presenting:** For each proposed child RFE, try to write ONE strategy-feature summary sentence. If you need "and" to describe what it does, it might be two features — but apply nuance:
+- **"and" connecting different user scenarios** is a red flag — these are likely two features. Check whether each side could ship independently and deliver value on its own. If yes, split.
+- **"and" within the same user scenario** is an amber signal — these may serve the same user need even if architecturally distinct. Consider whether they truly must ship together or just happen to be thematically related.
+
+**Cross-check against atomic inventory:** After writing the group summary, verify that *every* atomic capability placed in that group is accurately described by the group's summary. Go back to the one-sentence strategy-feature summary from Step 2b for each atomic capability in the group. If an atomic capability's summary is not a subset of the group summary — i.e., the group summary does not capture what that capability does — it has been incorrectly grouped and should be its own RFE or placed in a different group. This catches cases where a capability is absorbed into a thematically adjacent group despite serving a different user scenario.
+
+The right number of child RFEs is however many independently-valuable capabilities exist, not an arbitrary minimum.
+
+### Step 2d: Pre-screen Options
+
+Before presenting options to the user, score each proposed child RFE's right-sizing:
+
+For each child in each option, apply the smell test: "Can you write one strategy-feature summary sentence for this?" Score as:
+- **2/2**: Single focused need, one clear strategy summary
+- **1/2**: Slightly broad, summary needs "and" but capabilities are defensibly related
+- **0/2**: Clearly needs 3+ features
+
+Present a comparison table:
+
+```
+| Option | # RFEs | Right-sized scores | Notes |
+|--------|--------|--------------------|-------|
+| A      | 3      | 2, 2, 2            | All children focused |
+| B      | 2      | 1, 2               | Child 1 still slightly broad |
+| C      | 4      | 2, 2, 2, 1         | Child 4 bundles two concerns |
+```
+
+**Recommend the option with the most 2/2 scores.** If tied, prefer fewer RFEs (less Jira overhead). If an option has any child scoring 0/2, discard it — it hasn't solved the parent's problem.
+
+When evaluating whether capabilities belong together, consider:
+- Do they share the same code path / team / delivery timeline? (Favors grouping)
+- Are they independently valuable to different customer segments? (Favors splitting)
+- Are they inseparable? (Must stay together)
 
 Common decomposition axes:
 - **By capability area** — e.g., monitoring vs alerting vs reporting
@@ -35,7 +115,9 @@ Common decomposition axes:
 - **By delivery phase** — e.g., core need that unblocks value vs enhancements
 - **By scope boundary** — e.g., platform capability vs integration with external systems
 
-Present the options and ask the user to pick one, adjust it, or propose their own.
+Present the comparison table with your recommendation, and ask the user to confirm, adjust, or propose their own.
+
+**Tell the user**: After generating and reviewing the child RFEs, the skill will automatically attempt to correct any children that still score below 2/2 on Right-sized (up to 3 cycles). This catches grouping mistakes that aren't apparent until the full RFE is written and assessed. The user will see the final results after correction.
 
 ## Step 3: Generate New RFEs
 
@@ -56,6 +138,35 @@ Once the user confirms a decomposition:
 ## Step 4: Review New RFEs
 
 Run `/rfe.review` on the new artifacts. This runs rubric scoring, technical feasibility, and auto-revision.
+
+**Important:** `/rfe.review`'s revision principles state that right-sizing is "never auto-applied" — that applies to the review skill acting alone. When running inside `/rfe.split`, Step 4.5 below overrides that principle: this skill IS the right-sizing correction mechanism, and it MUST attempt to fix Right-sized scores below 2/2.
+
+## Step 4.5: Right-sizing Self-Correction (up to 3 cycles)
+
+**This step is mandatory, not advisory.** After `/rfe.review` completes, check whether any child RFE scored below 2/2 on Right-sized. If so, run up to 3 correction cycles. Do not defer to the user or skip this step — the `/rfe.review` principle "right-sizing is a recommendation, never auto-applied" does not apply here because `/rfe.split` is explicitly authorized to re-decompose children.
+
+### Each cycle:
+
+1. **Diagnose**: For each child scoring below 2/2, read the assessor's Right-sized feedback. Identify the specific grouping mistake:
+   - **Theme-based grouping**: Capabilities grouped by topic but independently deliverable with different teams, upstream dependencies, or delivery timelines
+   - **Mixed delivery paths**: One child spans both internal RHOAI work and upstream changes in different projects
+   - **Multiple user scenarios**: The strategy-feature summary requires "and" connecting different user scenarios
+   - **Different customer segments**: Capabilities serve different personas or compliance requirements
+
+2. **Re-decompose**: Return to the atomic capability inventory from Step 2b. For each offending child, re-apply the three decomposition questions:
+   - Could each grouped capability ship independently and deliver value?
+   - Does one require the other to function at all?
+   - Do they serve different customer segments or have different technical maturity?
+
+   Generate new child RFEs for the re-split capabilities. Archive the replaced child (rename to `.resplit`). Update `artifacts/rfes.md`.
+
+3. **Re-review**: Run `/rfe.review` on the new/changed artifacts only.
+
+4. **Evaluate**: If all children now score 2/2 on Right-sized, exit the loop and proceed to Step 5. Otherwise, continue to the next cycle.
+
+**After 3 cycles**, stop and present the remaining right-sizing concerns to the user. Some RFEs may legitimately score 1/2 — present the assessor's judgment rather than overriding it indefinitely.
+
+**Do not re-split for non-Right-sized criteria.** This loop corrects grouping mistakes caught by the Right-sized score. Other criteria (WHY, WHAT, HOW, Not a task) are handled by `/rfe.review`'s auto-revision.
 
 ## Step 5: Coverage Check
 

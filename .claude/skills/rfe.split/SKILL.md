@@ -1,12 +1,12 @@
 ---
 name: rfe.split
-description: Split an oversized RFE into smaller, right-sized RFEs. Accepts a local artifact (e.g., /rfe.split RFE-001) or Jira key (e.g., /rfe.split RHAIRFE-1234). Walks through decomposition options, generates new RFEs, reviews them, and checks for scope coverage gaps.
+description: Split an oversized RFE into smaller, right-sized RFEs. Accepts a local artifact (e.g., /rfe.split RFE-001) or Jira key (e.g., /rfe.split RHAIRFE-1234). Runs non-interactively: decomposes, generates new RFEs, reviews them, self-corrects, and checks coverage.
 user-invocable: true
 disable-model-invocation: true
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion, Skill, mcp__atlassian__jira_get_issue
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Skill, mcp__atlassian__jira_get_issue
 ---
 
-You are an RFE splitting assistant. Your job is to help decompose an oversized RFE into smaller, right-sized RFEs — each representing a coherent, independent business need.
+You are an RFE splitting assistant. Your job is to decompose an oversized RFE into smaller, right-sized RFEs — each representing a coherent, independent business need. This skill runs non-interactively: do not ask the user questions or wait for confirmation. Make decisions autonomously using the decomposition rules below, and present the final results when complete.
 
 ## Step 1: Load the Source RFE
 
@@ -16,7 +16,7 @@ Check if `$ARGUMENTS` contains a Jira key (e.g., `RHAIRFE-1234`) or a local arti
 
 **If a local artifact reference**: Find and read the matching file in `artifacts/rfe-tasks/`.
 
-**If no argument provided**: List available RFEs in `artifacts/rfe-tasks/` and ask the user which one to split.
+**If no argument provided**: Fail with: "Usage: `/rfe.split <RFE-NNN or RHAIRFE-1234>`. Provide a local artifact reference or a Jira key." Do not proceed.
 
 Also read `artifacts/rfe-review-report.md` if it exists — the right-sizing feedback explains why this RFE needs splitting.
 
@@ -115,20 +115,18 @@ Common decomposition axes:
 - **By delivery phase** — e.g., core need that unblocks value vs enhancements
 - **By scope boundary** — e.g., platform capability vs integration with external systems
 
-Present the comparison table with your recommendation, and ask the user to confirm, adjust, or propose their own.
-
-**Tell the user**: After generating and reviewing the child RFEs, the skill will automatically attempt to correct any children that still score below 2/2 on Right-sized (up to 3 cycles). This catches grouping mistakes that aren't apparent until the full RFE is written and assessed. The user will see the final results after correction.
+Present the comparison table with the recommended option, then proceed immediately with the recommended decomposition. Do not pause for user confirmation — the self-correction loop in Step 4.5 will catch grouping mistakes.
 
 ## Step 3: Generate New RFEs
 
-Once the user confirms a decomposition:
+Using the recommended decomposition:
 
 1. Generate new RFE artifacts using the template in `${CLAUDE_SKILL_DIR}/../rfe.create/rfe-template.md`
 2. Each new RFE must be a **coherent, standalone business need** — not just a slice of acceptance criteria. It needs its own problem statement, justification, and success criteria.
 3. Carry forward from the original:
    - Business justification (tailor to each child's specific scope)
    - Affected customers and segments
-   - Priority (may differ per child — ask the user if unclear)
+   - Priority (inherit from parent by default; differentiate only if clearly warranted and note the reasoning)
    - If the original came from Jira, note the source key (e.g., `**Split from**: RHAIRFE-1234`)
 4. Number new RFEs sequentially after the highest existing RFE number in `artifacts/rfe-tasks/`
 5. Write each to `artifacts/rfe-tasks/RFE-NNN-<slug>.md`
@@ -149,7 +147,7 @@ Run `/rfe.review` on the new artifacts. This runs rubric scoring, technical feas
 
 1. **Diagnose**: For each child scoring below 2/2, read the assessor's Right-sized feedback. Identify the specific grouping mistake:
    - **Theme-based grouping**: Capabilities grouped by topic but independently deliverable with different teams, upstream dependencies, or delivery timelines
-   - **Mixed delivery paths**: One child spans both internal RHOAI work and upstream changes in different projects
+   - **Mixed delivery paths**: One child spans both internal work and upstream changes in different projects
    - **Multiple user scenarios**: The strategy-feature summary requires "and" connecting different user scenarios
    - **Different customer segments**: Capabilities serve different personas or compliance requirements
 
@@ -188,12 +186,15 @@ Present the coverage matrix to the user:
 | Integration with external monitoring | NOT COVERED |
 ```
 
-**If gaps exist**, ask the user:
-- Add the missing scope to one of the new RFEs?
-- Create an additional RFE for it?
-- Intentionally drop it? (Record the decision)
+**If gaps exist**, resolve each uncovered capability automatically:
 
-If any changes are made, re-run `/rfe.review` on the affected RFEs.
+1. Apply the decomposition rules from Step 2b to the uncovered capability — could it ship independently? Does it require another capability? Does it serve a different customer segment?
+2. Check each existing child RFE: would adding this capability break its right-sizing (i.e., would the strategy-feature summary now need "and" connecting different user scenarios)?
+3. If the capability fits naturally in an existing child without breaking right-sizing, add it there.
+4. If it doesn't fit in any existing child, create a new child RFE for it.
+5. Flag all coverage gap decisions in the summary.
+
+If any changes were made (scope added to existing children or new children created), re-run `/rfe.review` on the affected RFEs. If right-sizing failures result, feed back into the Step 4.5 self-correction loop.
 
 ## Step 6: Summary
 

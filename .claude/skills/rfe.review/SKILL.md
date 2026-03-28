@@ -164,7 +164,7 @@ python3 scripts/frontmatter.py rebuild-index
 
 ## Step 4: Auto-Revise
 
-Always attempt at least one auto-revision cycle when any criterion scores below full marks. Improve what you can with available information. If a revision requires information you don't have (e.g., named customer accounts), make the best improvement possible and note the gap in Revision Notes for the user. Only skip auto-revision entirely if the RFE is technically infeasible or the problem statement needs to be rethought from scratch.
+Always attempt at least one auto-revision cycle when any criterion scores below full marks. Improve what you can with available information. If a revision requires information you don't have (e.g., named customer accounts), make the best improvement possible and note the gap in the review file's Revision History for the user. Only skip auto-revision entirely if the RFE is technically infeasible or the problem statement needs to be rethought from scratch.
 
 ### Revision Principles
 
@@ -184,7 +184,7 @@ This file must NOT be merged back into the RFE description.
 
 **Right-sizing is a recommendation, never auto-applied.** If the rubric scores Right-sized at 0 or 1, report the recommendation to split in the review file. Do NOT remove acceptance criteria, scope items, or capabilities from the artifact to force a different shape. Splitting an RFE is a structural decision that changes what the RFE *is* — only the author can make that call.
 
-**Do not invent missing evidence.** If the rubric flags weak business justification due to missing named customers or revenue data, flag the gap in Revision Notes for the author to fill. Do not fabricate evidence.
+**Do not invent missing evidence.** If the rubric flags weak business justification due to missing named customers or revenue data, flag the gap in the review file's Revision History for the author to fill. Do not fabricate evidence.
 
 ### Revision Steps
 
@@ -195,7 +195,7 @@ This file must NOT be merged back into the RFE description.
    - **WHY**: Strengthen with available evidence (stakeholder comments, strategic alignment references); flag gaps the author must fill (named customers, revenue data)
    - **Right-sized**: Report the recommendation only; do not split or remove scope. Advise the user to run `/rfe.split` if splitting is needed
    - **WHAT / Not a task**: Follow assessor guidance if provided
-4. Add a `### Revision Notes` section at the end of each RFE **only if its content was actually changed** (sections rewritten, reframed, or removed). The Revision Notes should document what changed and why. Do NOT add Revision Notes to artifacts where no content was modified — gaps that require author input (e.g., missing named customers) belong only in the review file, not in the artifact.
+4. Document what changed and why in the review file's `## Revision History` section. Do NOT add revision notes to the RFE artifact itself — keep RFE files clean with only frontmatter and business content. Gaps that require author input (e.g., missing named customers) also belong in the review file, not in the artifact.
 5. Update the review file frontmatter: set `revised=true` if content was modified, set `needs_attention=true` if human review is still needed
 6. Re-run the review (go back to Step 2) on the revised artifacts
 

@@ -26,7 +26,7 @@ In revision mode:
 - **Do not regenerate from scratch.** Read the existing strategy content and the review feedback.
 - **Address each reviewer's concerns specifically.** The review file contains findings from up to 4 independent reviewers (feasibility, testability, scope, architecture). Address each concern that has merit.
 - **Preserve what's working.** If reviewers approved aspects of the strategy, don't rewrite those sections.
-- **Note what changed.** Add a `### Revision Notes` section at the end of each revised strategy listing what was changed and why, referencing the specific review concerns addressed.
+- **Note what changed.** Document what changed and why in the review file's `## Revision History` section (`artifacts/strat-reviews/{id}-review.md`), not in the strategy artifact itself. Keep strategy files clean with only frontmatter and business/strategy content.
 - **Flag disagreements.** If you believe a reviewer's concern is invalid, keep the current approach and explain why in the revision notes rather than silently ignoring it.
 
 If no review files exist, this is initial refinement — generate the strategy from the stub.

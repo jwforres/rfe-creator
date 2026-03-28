@@ -84,8 +84,6 @@ Regardless of whether Jira cloning succeeded, create stub files in `artifacts/st
 Write the markdown body to `artifacts/strat-tasks/STRAT-NNN-<slug>.md`:
 
 ```markdown
-# STRAT-NNN: <title>
-
 ## Business Need (from RFE)
 <Full content copied from the source RFE — this is fixed input for strategy refinement>
 

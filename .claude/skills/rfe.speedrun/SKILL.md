@@ -44,13 +44,13 @@ Do not run `/rfe.create`. The RFE already exists in Jira.
 
 Run `/rfe.review $ARGUMENTS` — this fetches the RFE from Jira, reviews it, and auto-revises.
 
-**If all RFEs pass** (rubric >= 7/10 with no zeros, feasibility is feasible/conditional): proceed to Phase 3.
+**If all RFEs pass** (rubric >= 7/10 with no zeros, feasibility is feasible): proceed to Phase 3.
 
-**If any RFE fails**: Auto-revise the failing RFEs using the review feedback. Read the review report, identify the specific issues, edit the RFE artifact files to address them, then re-run `/rfe.review`.
+**If any RFE fails**: Auto-revise the failing RFEs using the review feedback. Read the review files in `artifacts/rfe-reviews/`, identify the specific issues, edit the RFE artifact files to address them, then re-run `/rfe.review`.
 
 **Revision limits**:
 - Maximum 2 revision cycles
-- If RFEs still fail after 2 cycles, stop and present the review report to the user
+- If RFEs still fail after 2 cycles, stop and present the review results to the user
 - Tell them: "These RFEs need manual attention. Run `/rfe.review` after editing to continue."
 
 ### Phase 3: Submit
@@ -68,7 +68,7 @@ At the end, summarize what happened:
 - RHAIRFE-NNNN: <title> (Priority: Normal)
 
 Review cycles: N
-Artifacts: artifacts/rfes.md, artifacts/rfe-tasks/, artifacts/rfe-review-report.md, artifacts/jira-tickets.md
+Artifacts: artifacts/rfes.md, artifacts/rfe-tasks/, artifacts/rfe-reviews/
 ```
 
 $ARGUMENTS

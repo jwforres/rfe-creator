@@ -13,7 +13,7 @@ You are a test engineer reviewing refined strategy features. Your job is to dete
 
 Read the strategy artifacts in `artifacts/strat-tasks/`. Cross-reference against the source RFEs in `artifacts/rfe-tasks/` for the original acceptance criteria.
 
-If `artifacts/strat-review-report.md` exists, read it — this is a re-review.
+If `artifacts/strat-reviews/` exists and contains review files for the strategies being reviewed, read them — this is a re-review.
 
 ## What to Assess
 

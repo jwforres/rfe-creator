@@ -25,13 +25,37 @@ Check if `JIRA_SERVER`, `JIRA_USER`, and `JIRA_TOKEN` environment variables are 
 >
 > After environment variables are set, re-run `/rfe.submit`.
 
-## Step 1: Detect Mode and Run
+## Step 1: Conflict Detection
 
-Read `artifacts/rfes.md`. Determine whether this is a split submission or standard submission.
+Before submitting, check for concurrent modifications to any Jira-sourced RFEs (those with `rfe_id` starting with `RHAIRFE-`).
+
+For each Jira-sourced RFE being submitted, check if an original snapshot exists at `artifacts/rfe-originals/<rfe_id>.md`. If it does:
+
+1. Re-fetch the current Jira description using the REST API script:
+
+```bash
+python3 scripts/fetch_issue.py <rfe_id> --fields summary,description --markdown
+```
+
+2. Compare the fetched `fields.description` against the contents of the original snapshot file (which contains the raw Jira description, not the templated version). If they differ, someone modified the RFE in Jira since we last fetched it.
+
+3. **If a conflict is detected**: Stop submission for that RFE. Report the conflict:
+
+> **Conflict detected for `<rfe_id>`**: The RFE was modified in Jira since it was last fetched. Submitting would overwrite those changes.
+>
+> To resolve: re-fetch from Jira by running `/rfe.review <rfe_id>`, then re-apply your changes.
+
+4. **If no conflict**: Proceed with submission.
+
+If no original snapshot exists (e.g., for locally-created RFEs with `RFE-NNN` IDs), skip conflict detection — there is no Jira state to conflict with.
+
+## Step 2: Detect Mode and Run
+
+Check task file frontmatter to determine whether this is a split submission or standard submission.
 
 ### Split Submission
 
-If any RFE has an "Archived" status containing "split", run:
+If any task file has `status: Archived` and other task files have a matching `parent_key`, this is a split submission. Find the parent's `rfe_id` from its frontmatter and run:
 
 ```bash
 python3 scripts/split_submit.py <PARENT_KEY> [--dry-run] [--artifacts-dir artifacts]
@@ -42,6 +66,8 @@ The split submit script handles:
 - Creating child tickets with proper "Issue split" linking to the parent
 - Closing the parent ticket as Obsolete
 - Idempotent recovery if interrupted
+- Renaming local files from RFE-NNN to RHAIRFE-NNNN after submission
+- Rebuilding the rfes.md index
 
 ### Standard Submission
 
@@ -52,16 +78,17 @@ python3 scripts/submit.py [--dry-run] [--artifacts-dir artifacts]
 ```
 
 The standard submit script handles:
-- Reading the review report and skipping rejected RFEs
-- Creating new RHAIRFE tickets for RFEs without a Jira key
-- Updating existing tickets for RFEs fetched from Jira (by Jira key)
+- Reading review recommendations from `rfe-reviews/` frontmatter and skipping rejected RFEs
+- Creating new RHAIRFE tickets for RFEs with local IDs (RFE-NNN)
+- Updating existing tickets for RFEs with Jira IDs (RHAIRFE-NNNN)
 - Applying labels from the labeling scheme (see below)
 - Posting removed-context comments where applicable
-- Writing the ticket mapping to `artifacts/jira-tickets.md`
+- Renaming local files from RFE-NNN to RHAIRFE-NNNN after submission
+- Rebuilding the rfes.md index
 
-## Step 2: Report Results
+## Step 3: Report Results
 
-After the script completes, read and report the results from `artifacts/jira-tickets.md`.
+After the script completes, read `artifacts/rfes.md` (rebuilt by the script) and report the results.
 
 If the script fails, report the error and suggest the user check credentials or use `--dry-run` to validate locally.
 
@@ -72,9 +99,9 @@ The scripts automatically apply labels based on what happened during the pipelin
 | Label | When applied |
 |-------|-------------|
 | `rfe-creator-auto-created` | Ticket was created by the pipeline (new RFEs, not updates) |
-| `rfe-creator-auto-revised` | Ticket content was modified by automation (artifact contains Revision Notes) |
+| `rfe-creator-auto-revised` | Ticket content was modified by automation (review frontmatter `revised: true`) |
 | `rfe-creator-split-original` | Parent ticket that was decomposed into smaller RFEs |
 | `rfe-creator-split-result` | Child ticket produced by splitting another RFE |
-| `rfe-creator-needs-attention` | Automation couldn't fully resolve all issues — human review needed |
+| `rfe-creator-needs-attention` | Automation couldn't fully resolve all issues — human review needed (review frontmatter `needs_attention: true`) |
 
 $ARGUMENTS

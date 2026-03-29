@@ -14,11 +14,6 @@ Scale the output to match the size of the RFE. Use the appropriate section set b
 ## Concise Format (S)
 
 ```markdown
-# RFE-NNN: <Title>
-
-**Priority**: <Blocker|Critical|Major|Normal|Minor>
-**Size**: S
-
 ## Summary
 <2-3 sentences: what the user needs and why>
 
@@ -38,11 +33,6 @@ Scale the output to match the size of the RFE. Use the appropriate section set b
 ## Standard Format (M)
 
 ```markdown
-# RFE-NNN: <Title>
-
-**Priority**: <Blocker|Critical|Major|Normal|Minor>
-**Size**: M
-
 ## Summary
 <What the user needs and why, in enough detail to be unambiguous>
 
@@ -69,11 +59,6 @@ Scale the output to match the size of the RFE. Use the appropriate section set b
 ## Full Format (L/XL)
 
 ```markdown
-# RFE-NNN: <Title>
-
-**Priority**: <Blocker|Critical|Major|Normal|Minor>
-**Size**: <L|XL>
-
 ## Summary
 <Comprehensive description of the business need>
 

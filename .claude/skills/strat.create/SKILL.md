@@ -11,8 +11,13 @@ You are a strategy creation assistant. Your job is to create strategies from app
 
 Check for available RFE sources:
 
-1. **Local artifacts** — check for `artifacts/rfe-tasks/` and `artifacts/rfes.md`
-2. **Jira** — check if Jira MCP is available or if `JIRA_SERVER`/`JIRA_USER`/`JIRA_TOKEN` env vars are set, and if the user has provided RHAIRFE keys or `artifacts/jira-tickets.md` exists
+1. **Local artifacts** — check for `artifacts/rfe-tasks/` files with valid frontmatter. Read Jira keys from task file frontmatter:
+
+```bash
+python3 scripts/frontmatter.py read artifacts/rfe-tasks/<file>.md
+```
+
+2. **Jira** — check if Jira MCP is available or if `JIRA_SERVER`/`JIRA_USER`/`JIRA_TOKEN` env vars are set, and if the user has provided RHAIRFE keys
 
 **If both local artifacts and Jira are available**: Ask the user which source to use. Local artifacts may have been edited after submission; Jira has the canonical version. Let the user decide.
 
@@ -74,15 +79,11 @@ After cloning, run `/strat.refine` to add the technical strategy.
 
 ## Step 4: Create Local Strategy Stubs
 
-Regardless of whether Jira cloning succeeded, create stub files in `artifacts/strat-tasks/` for each strategy:
+Regardless of whether Jira cloning succeeded, create stub files in `artifacts/strat-tasks/` for each strategy.
+
+Write the markdown body to `artifacts/strat-tasks/STRAT-NNN-<slug>.md`:
 
 ```markdown
-# STRAT-NNN: <title>
-
-**Source RFE**: <RFE-NNN or RHAIRFE-NNNN>
-**Jira Key**: <RHAISTRAT-NNNN if cloned, otherwise "pending — see strat-jira-guide.md">
-**Priority**: <priority from source RFE>
-
 ## Business Need (from RFE)
 <Full content copied from the source RFE — this is fixed input for strategy refinement>
 
@@ -91,6 +92,26 @@ Regardless of whether Jira cloning succeeded, create stub files in `artifacts/st
 ```
 
 The business need section is copied verbatim from the RFE. It must not be modified during strategy work.
+
+Then set frontmatter on each strategy file. First, read the schema to know exact field names and allowed values:
+
+```bash
+python3 scripts/frontmatter.py schema strat-task
+```
+
+Then set frontmatter using the actual values for this strategy:
+
+```bash
+python3 scripts/frontmatter.py set artifacts/strat-tasks/<filename>.md \
+    strat_id=<strat_id> \
+    title="<title>" \
+    source_rfe=<source_rfe_id> \
+    jira_key=<RHAISTRAT_key_or_null> \
+    priority=<priority> \
+    status=Draft
+```
+
+Use `jira_key=null` if Jira cloning was not done.
 
 ## Step 5: Write Artifacts
 

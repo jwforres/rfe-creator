@@ -12,7 +12,9 @@ You are an RFE splitting assistant. Your job is to decompose an oversized RFE in
 
 Check if `$ARGUMENTS` contains a Jira key (e.g., `RHAIRFE-1234`) or a local artifact reference (e.g., `RFE-001`).
 
-**If a Jira key**: Fetch the RFE from Jira. Try `mcp__atlassian__getJiraIssue` first. If the MCP tool is unavailable, fall back to the REST API script:
+**If a Jira key**: First check if `artifacts/rfe-tasks/<jira_key>.md` already exists locally. If it does, use the local copy — do not re-fetch from Jira. This preserves any local edits from prior review or split cycles.
+
+**If the local file does not exist**, fetch the RFE from Jira. Try `mcp__atlassian__getJiraIssue` first. If the MCP tool is unavailable, fall back to the REST API script:
 
 ```bash
 python3 scripts/fetch_issue.py RHAIRFE-1234 --fields summary,description,priority,labels,status --markdown
@@ -20,13 +22,32 @@ python3 scripts/fetch_issue.py RHAIRFE-1234 --fields summary,description,priorit
 
 The script outputs JSON to stdout with the description already converted to markdown. Parse `fields.description`, `fields.summary`, and `fields.priority.name`.
 
-Write it to `artifacts/rfe-tasks/` as a local artifact using the RFE template format (read `${CLAUDE_SKILL_DIR}/../rfe.create/rfe-template.md` for the format). Record the Jira key in the artifact metadata.
+Write it to `artifacts/rfe-tasks/<jira_key>.md` using the RFE template format (read `${CLAUDE_SKILL_DIR}/../rfe.create/rfe-template.md` for the format).
+
+First, read the schema to know exact field names and allowed values:
+
+```bash
+python3 scripts/frontmatter.py schema rfe-task
+```
+
+Then set frontmatter, using the Jira key as the `rfe_id`:
+
+```bash
+python3 scripts/frontmatter.py set artifacts/rfe-tasks/<jira_key>.md \
+    rfe_id=<jira_key> \
+    title="<title>" \
+    priority=<priority> \
+    size=<size> \
+    status=Ready
+```
+
+**Save an original snapshot** of the raw Jira description to `artifacts/rfe-originals/<jira_key>.md`. Write the `fields.description` value as-is (the raw markdown from Jira, not the templated version). This snapshot is used for (1) before/after data analysis of what remediation changed, and (2) optimistic conflict detection at submit time — the submit skill re-fetches the description from Jira and compares it against this file to detect concurrent modifications. Create the `artifacts/rfe-originals/` directory if it doesn't exist. This file is never modified by split or revision — it is only overwritten by a fresh Jira fetch.
 
 **If a local artifact reference**: Find and read the matching file in `artifacts/rfe-tasks/`.
 
 **If no argument provided**: Fail with: "Usage: `/rfe.split <RFE-NNN or RHAIRFE-1234>`. Provide a local artifact reference or a Jira key." Do not proceed.
 
-Also read `artifacts/rfe-review-report.md` if it exists — the right-sizing feedback explains why this RFE needs splitting.
+Also check for a prior review in `artifacts/rfe-reviews/` for this RFE — the right-sizing feedback explains why this RFE needs splitting.
 
 ## Step 1.5: Load Right-sizing Rubric
 
@@ -47,8 +68,8 @@ If the bootstrap fails, proceed with a basic right-sizing heuristic: each child 
 ### Step 2a: Triage Already-Delivered Capabilities
 
 Before decomposing, check for capabilities that are already delivered or in progress. Sources:
-- The review report (`artifacts/rfe-review-report.md`) may flag delivered items
-- Stakeholder comments (`artifacts/rfe-tasks/RFE-NNN-comments.md`) often reveal what has shipped
+- The review file (`artifacts/rfe-reviews/{id}-review.md`) may flag delivered items
+- Stakeholder comments (`artifacts/rfe-tasks/{id}-comments.md`) often reveal what has shipped
 - Related strategy tickets mentioned in the RFE
 
 For each acceptance criterion and scope item, mark it as:
@@ -138,8 +159,30 @@ Using the recommended decomposition:
    - If the original came from Jira, note the source key (e.g., `**Split from**: RHAIRFE-1234`)
 4. Number new RFEs sequentially after the highest existing RFE number in `artifacts/rfe-tasks/`
 5. Write each to `artifacts/rfe-tasks/RFE-NNN-<slug>.md`
-6. Archive the original by renaming it to `RFE-NNN-<slug>.md.split`
-7. Update `artifacts/rfes.md` — remove the original entry, add the new RFEs
+6. Set frontmatter on each child with `parent_key` pointing to the original's `rfe_id`:
+
+```bash
+python3 scripts/frontmatter.py set artifacts/rfe-tasks/<child_filename>.md \
+    rfe_id=<child_rfe_id> \
+    title="<child_title>" \
+    priority=<priority> \
+    size=<size> \
+    status=Draft \
+    parent_key=<parent_rfe_id>
+```
+
+7. Archive the original by updating its frontmatter status:
+
+```bash
+python3 scripts/frontmatter.py set artifacts/rfe-tasks/<original_filename>.md \
+    status=Archived
+```
+
+8. Rebuild the index:
+
+```bash
+python3 scripts/frontmatter.py rebuild-index
+```
 
 ## Step 4: Review New RFEs
 
@@ -149,11 +192,11 @@ Run `/rfe.review` on the new artifacts. This runs rubric scoring, technical feas
 
 ## Step 4.5: Right-sizing Self-Correction (up to 3 cycles)
 
-**This step is mandatory, not advisory.** After `/rfe.review` completes, check whether any child RFE scored below 2/2 on Right-sized. If so, run up to 3 correction cycles. Do not defer to the user or skip this step — the `/rfe.review` principle "right-sizing is a recommendation, never auto-applied" does not apply here because `/rfe.split` is explicitly authorized to re-decompose children.
+**This step is mandatory, not advisory.** After `/rfe.review` completes, check whether any child RFE scored below 2/2 on Right-sized (read from `artifacts/rfe-reviews/{id}-review.md` frontmatter: `scores.right_sized`). If so, run up to 3 correction cycles. Do not defer to the user or skip this step — the `/rfe.review` principle "right-sizing is a recommendation, never auto-applied" does not apply here because `/rfe.split` is explicitly authorized to re-decompose children.
 
 ### Each cycle:
 
-1. **Diagnose**: For each child scoring below 2/2, read the assessor's Right-sized feedback. Identify the specific grouping mistake:
+1. **Diagnose**: For each child scoring below 2/2, read the assessor's Right-sized feedback from the review file. Identify the specific grouping mistake:
    - **Theme-based grouping**: Capabilities grouped by topic but independently deliverable with different teams, upstream dependencies, or delivery timelines
    - **Mixed delivery paths**: One child spans both internal work and upstream changes in different projects
    - **Multiple user scenarios**: The strategy-feature summary requires "and" connecting different user scenarios
@@ -164,7 +207,7 @@ Run `/rfe.review` on the new artifacts. This runs rubric scoring, technical feas
    - Does one require the other to function at all?
    - Do they serve different customer segments or have different technical maturity?
 
-   Generate new child RFEs for the re-split capabilities. Archive the replaced child (rename to `.resplit`). Update `artifacts/rfes.md`.
+   Generate new child RFEs for the re-split capabilities. Archive the replaced child (set `status=Archived` in frontmatter). Rebuild the index.
 
 3. **Re-review**: Run `/rfe.review` on the new/changed artifacts only.
 
@@ -211,7 +254,7 @@ Present the final state:
 ```
 ## Split Complete
 
-Original: RFE-001 (archived as RFE-001-*.md.split)
+Original: RHAIRFE-1234 (archived)
 New RFEs:
 - RFE-003: <title> (Priority: Normal) — PASS
 - RFE-004: <title> (Priority: Normal) — PASS

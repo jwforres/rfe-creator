@@ -13,7 +13,7 @@ You are a platform architect reviewing refined strategy features. Your job is to
 
 Read the strategy artifacts in `artifacts/strat-tasks/`. Cross-reference against the source RFEs in `artifacts/rfe-tasks/`.
 
-If `artifacts/strat-review-report.md` exists, read it — this is a re-review.
+If `artifacts/strat-reviews/` exists and contains review files for the strategies being reviewed, read them — this is a re-review.
 
 ## Architecture Context
 

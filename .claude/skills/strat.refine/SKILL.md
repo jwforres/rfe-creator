@@ -10,20 +10,26 @@ You are a senior engineer performing feature refinement. Your job is to take app
 
 ## Inputs
 
-Read the strategy files in `artifacts/strat-tasks/`. Each contains the business need from the source RFE. This business need is **fixed input** — do not modify it, weaken it, or reinterpret it. Your job is to add or revise the HOW, not change the WHAT.
+Read the strategy files in `artifacts/strat-tasks/`. Each has YAML frontmatter with structured metadata (strat_id, title, source_rfe, priority, status). Read frontmatter with:
+
+```bash
+python3 scripts/frontmatter.py read artifacts/strat-tasks/<filename>.md
+```
+
+Each file also contains the business need from the source RFE. This business need is **fixed input** — do not modify it, weaken it, or reinterpret it. Your job is to add or revise the HOW, not change the WHAT.
 
 ## Revision Mode
 
-Check if `artifacts/strat-review-report.md` exists. If it does, this is a revision — the strategies have already been refined and reviewed. Read the review report carefully.
+Check if prior reviews exist in `artifacts/strat-reviews/` for any of the strategies being refined. If they do, this is a revision — the strategies have already been refined and reviewed. Read each strategy's review file.
 
 In revision mode:
 - **Do not regenerate from scratch.** Read the existing strategy content and the review feedback.
-- **Address each reviewer's concerns specifically.** The report contains findings from up to 4 independent reviewers (feasibility, testability, scope, architecture). Address each concern that has merit.
+- **Address each reviewer's concerns specifically.** The review file contains findings from up to 4 independent reviewers (feasibility, testability, scope, architecture). Address each concern that has merit.
 - **Preserve what's working.** If reviewers approved aspects of the strategy, don't rewrite those sections.
-- **Note what changed.** Add a `### Revision Notes` section at the end of each revised strategy listing what was changed and why, referencing the specific review concerns addressed.
+- **Note what changed.** Document what changed and why in the review file's `## Revision History` section (`artifacts/strat-reviews/{id}-review.md`), not in the strategy artifact itself. Keep strategy files clean with only frontmatter and business/strategy content.
 - **Flag disagreements.** If you believe a reviewer's concern is invalid, keep the current approach and explain why in the revision notes rather than silently ignoring it.
 
-If no review report exists, this is initial refinement — generate the strategy from the stub.
+If no review files exist, this is initial refinement — generate the strategy from the stub.
 
 ## Architecture Context
 
@@ -55,5 +61,12 @@ For each strategy, use the template in `${CLAUDE_SKILL_DIR}/strat-template.md`. 
 ## Output
 
 Update each file in `artifacts/strat-tasks/` with the completed strategy. Preserve the business need section unchanged.
+
+After writing the strategy content, update the frontmatter status:
+
+```bash
+python3 scripts/frontmatter.py set artifacts/strat-tasks/<filename>.md \
+    status=Refined
+```
 
 $ARGUMENTS

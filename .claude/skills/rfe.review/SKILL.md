@@ -138,6 +138,21 @@ python3 scripts/frontmatter.py set artifacts/rfe-reviews/<id>-review.md \
     scores.right_sized=<right_sized_score>
 ```
 
+**Before scores**: On the **first** scoring pass (before any auto-revision), also write the initial scores as `before_score` and `before_scores.*`. These capture the as-fetched quality baseline for the review report. On subsequent passes (after auto-revision), do NOT include `before_score`/`before_scores` — the `set` command merges fields, so the originals are preserved automatically.
+
+```bash
+# First pass only — write before scores alongside the initial scores:
+python3 scripts/frontmatter.py set artifacts/rfe-reviews/<id>-review.md \
+    before_score=<total_score> \
+    before_scores.what=<what_score> \
+    before_scores.why=<why_score> \
+    before_scores.open_to_how=<open_to_how_score> \
+    before_scores.not_a_task=<not_a_task_score> \
+    before_scores.right_sized=<right_sized_score>
+```
+
+**Re-review guard**: If `before_scores` already exists in the frontmatter (check with `frontmatter.py read`), do NOT overwrite it — it represents the original baseline, not the previous revision's scores.
+
 Use the RFE's `rfe_id` for the filename prefix (e.g., `RHAIRFE-1234-review.md` for Jira-fetched RFEs, `RFE-001-slug-review.md` for local RFEs).
 
 The review file body should contain:
@@ -185,7 +200,7 @@ Always attempt at least one auto-revision cycle when any criterion scores below 
 1. Read the **full** review feedback for each failing RFE (from the review file just written)
 2. Read the comments file (`artifacts/rfe-tasks/{id}-comments.md`) if it exists — stakeholder comments may explain why certain content is intentional
 3. For each criterion the assessor flagged, follow its specific recommendations:
-   - **Open to HOW**: Reframe flagged sections to remove prescriptive framing while preserving useful context. If content cannot be reframed, remove it from the RFE — the preservation check will track it automatically
+   - **Open to HOW**: Reframe flagged sections to remove prescriptive framing while preserving useful context. If content cannot be reframed, remove it from the RFE — the preservation check will track it automatically. **Critical distinction**: When the RFE is about integrating with or providing a specific vendor project, product, or API, naming that project/product is part of the WHAT (the business need), not the HOW. Do not generalize away named vendor solutions that are the subject of the integration. Only reframe language that prescribes *internal implementation choices* (architecture patterns, specific K8s resources, build tooling, deployment ratios).
    - **WHY**: Strengthen with available evidence (stakeholder comments, strategic alignment references); flag gaps the author must fill (named customers, revenue data)
    - **Right-sized**: Report the recommendation only; do not split or remove scope. Advise the user to run `/rfe.split` if splitting is needed
    - **WHAT / Not a task**: Follow assessor guidance if provided
@@ -196,8 +211,8 @@ Always attempt at least one auto-revision cycle when any criterion scores below 
    The `--write-yaml` flag automatically writes any missing blocks to `artifacts/rfe-tasks/{id}-removed-context.yaml` with `type: unclassified`. This ensures no content is silently dropped.
 
 5. **Classify removed blocks**: Read the YAML file and update each block's `type` field:
-   - **`reworded`**: The information is still in the RFE, just expressed differently (e.g., prescriptive rules reframed as user outcomes). This block will NOT be posted to Jira.
-   - **`genuine`**: Implementation specifics (API names, parameter schemas, architecture decisions) not present in the RFE that would be useful RHAISTRAT context. This block WILL be posted as a Jira comment during `/rfe.submit`.
+   - **`reworded`**: The same intent is still in the RFE, just expressed differently (e.g., prescriptive rules reframed as user outcomes). This block will NOT be posted to Jira. **Exception**: If the original text names specific vendor projects/products, specific APIs or libraries, or specific technology choices that were generalized away during reframing, classify as `genuine` instead — those specifics are useful engineering context even if the capability intent is preserved.
+   - **`genuine`**: Implementation specifics (API names, parameter schemas, architecture decisions, named vendor projects/products, specific libraries) not present in the RFE that would be useful RHAISTRAT context. This block WILL be posted as a Jira comment during `/rfe.submit`.
    - **`non-substantive`**: Marketing filler, empty template placeholders, or generic statements with no recoverable substance. This block will NOT be posted to Jira.
 
    **After classifying, verify all blocks have been classified** — scan the YAML for any remaining `type: unclassified` entries and fix them. As a safety net, `/rfe.submit` treats `unclassified` blocks the same as `genuine` (they get posted) to prevent unintentional data loss.

@@ -47,3 +47,7 @@ Architecture context is used during:
 - Strategy skills (Phase 2)
 
 Architecture context is NOT used during `/rfe.create` — RFEs describe business needs, not implementation.
+
+## Upstream Sync Check
+
+Before running any `/rfe.*` or `/strat.*` skill for the first time in a conversation, run `bash .claude/hooks/check-upstream-sync.sh` and inform the user of the result. Only do this once per conversation.

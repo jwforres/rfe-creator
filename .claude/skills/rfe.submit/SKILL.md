@@ -27,27 +27,18 @@ Check if `JIRA_SERVER`, `JIRA_USER`, and `JIRA_TOKEN` environment variables are 
 
 ## Step 1: Conflict Detection
 
-Before submitting, check for concurrent modifications to any Jira-sourced RFEs (those with `rfe_id` starting with `RHAIRFE-`).
-
-For each Jira-sourced RFE being submitted, check if an original snapshot exists at `artifacts/rfe-originals/<rfe_id>.md`. If it does:
-
-1. Re-fetch the current Jira description using the REST API script:
+Run the conflict check script:
 
 ```bash
-python3 scripts/fetch_issue.py <rfe_id> --fields summary,description --markdown
+python3 scripts/check_conflicts.py --artifacts-dir artifacts
 ```
 
-2. Compare the fetched `fields.description` against the contents of the original snapshot file (which contains the raw Jira description, not the templated version). If they differ, someone modified the RFE in Jira since we last fetched it.
+Parse the output and exit code:
+- **Exit code 0**: No conflicts. Proceed to Step 2.
+- **Exit code 1**: Conflicts detected. Report each `CONFLICT:` line to the user and stop. Tell them to re-fetch from Jira by running `/rfe.review <rfe_id>`, then re-apply changes.
+- **Exit code 2**: Missing credentials. Show the credential setup instructions from Step 0 and stop.
 
-3. **If a conflict is detected**: Stop submission for that RFE. Report the conflict:
-
-> **Conflict detected for `<rfe_id>`**: The RFE was modified in Jira since it was last fetched. Submitting would overwrite those changes.
->
-> To resolve: re-fetch from Jira by running `/rfe.review <rfe_id>`, then re-apply your changes.
-
-4. **If no conflict**: Proceed with submission.
-
-If no original snapshot exists (e.g., for locally-created RFEs with `RFE-NNN` IDs), skip conflict detection — there is no Jira state to conflict with.
+Skip conflict detection for `--dry-run` — go directly to Step 2.
 
 ## Step 2: Detect Mode and Run
 

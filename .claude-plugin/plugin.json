@@ -1,0 +1,13 @@
+{
+  "name": "rfe-creator",
+  "version": "1.0.0",
+  "description": "Create, review, and submit RFEs to RHAIRFE Jira. Refine approved RFEs into strategies in RHAISTRAT.",
+  "author": {
+    "name": "jwforres",
+    "url": "https://github.com/jwforres"
+  },
+  "repository": "https://github.com/jwforres/rfe-creator",
+  "keywords": ["rfe", "jira", "strategy", "product-management", "rhairfe", "rhaistrat"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json"
+}

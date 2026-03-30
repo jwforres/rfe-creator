@@ -1,7 +1,6 @@
 .DS_Store
 .context/
 artifacts/
-.claude/skills/assess-rfe/
-.claude/skills/export-rubric/
+skills/assess-rfe/
+skills/export-rubric/
 __pycache__/
-.mcp.json

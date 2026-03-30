@@ -1,33 +1,57 @@
 # RFE Creator
 
-Claude Code skills for creating, reviewing, and submitting RFEs to the RHAIRFE Jira project.
+A Claude Code plugin for creating, reviewing, and submitting RFEs to the RHAIRFE Jira project.
 
 Inspired by the [PRD/RFE workflow](https://github.com/ambient-code/workflows/tree/main/workflows/prd-rfe-workflow) in ambient, which established the pipeline pattern and multi-perspective review concept.
 
-## Quick Start
+## Installation
+
+Install as a Claude Code plugin from the marketplace or directly from GitHub:
+
+```bash
+claude plugin add --from https://github.com/jwforres/rfe-creator
+```
+
+### Configuration
+
+Set your Jira credentials as environment variables (required for submit/update operations):
 
 ```
-# RFE Pipeline
-/rfe.create     # Write a new RFE from a problem statement
-/rfe.review     # Review, improve, and auto-revise RFEs
-/rfe.split      # Split an oversized RFE into right-sized pieces
-/rfe.submit     # Submit new or update existing RFEs in Jira
-/rfe.speedrun   # Full pipeline end-to-end with minimal interaction
-
-# Improve an existing Jira RFE
-/rfe.review RHAIRFE-1234      # Fetch, review, and auto-revise
-/rfe.split RHAIRFE-1234       # Fetch and split an oversized RFE
-/rfe.speedrun RHAIRFE-1234    # Fetch, review, revise, and update in one step
-
-# Strategy Pipeline (after RFE approval)
-/strat.create      # Clone approved RFEs to RHAISTRAT in Jira
-/strat.refine      # Feature refinement — the HOW
-/strat.review      # Adversarial review (4 independent reviewers)
-/strat.prioritize  # Place in existing backlog
-
-# Maintenance
-/rfe-creator.update-deps   # Force update vendored dependencies
+JIRA_URL=https://your-site.atlassian.net
+JIRA_USERNAME=your-email@example.com
+JIRA_API_TOKEN=your-api-token
 ```
+
+To create an API token: https://id.atlassian.com/manage-profile/security/api-tokens
+
+The plugin includes an Atlassian MCP server configuration for read operations. Write operations use Python scripts with the Jira REST API directly for deterministic, transactional workflows.
+
+## Skills
+
+### RFE Pipeline
+
+| Skill | Description |
+|-------|-------------|
+| `/rfe.create` | Write a new RFE from a problem statement |
+| `/rfe.review [RHAIRFE-key]` | Review, improve, and auto-revise RFEs |
+| `/rfe.split [RFE-NNN / RHAIRFE-key]` | Split an oversized RFE into right-sized pieces |
+| `/rfe.submit` | Submit new or update existing RFEs in Jira |
+| `/rfe.speedrun [idea / RHAIRFE-key]` | Full pipeline end-to-end with minimal interaction |
+
+### Strategy Pipeline (after RFE approval)
+
+| Skill | Description |
+|-------|-------------|
+| `/strat.create` | Clone approved RFEs to RHAISTRAT in Jira |
+| `/strat.refine` | Add the HOW — dependencies, components, NFRs |
+| `/strat.review` | Adversarial review (4 independent reviewers) |
+| `/strat.prioritize` | Place in existing backlog (not yet implemented) |
+
+### Maintenance
+
+| Skill | Description |
+|-------|-------------|
+| `/rfe-creator.update-deps` | Force update vendored dependencies |
 
 ## Pipeline
 
@@ -55,23 +79,32 @@ Or in one step: `/rfe.speedrun RHAIRFE-1234`
 /strat.create → /strat.refine → /strat.review → /strat.prioritize
 ```
 
-## Pipeline Steps
+## Plugin Structure
 
-1. **Create**: Describe your need. The skill asks clarifying questions and produces RFEs.
-2. **Review**: Scores RFEs against the assess-rfe rubric, checks technical feasibility, and auto-revises issues. Accepts a Jira key to review existing RFEs.
-3. **Split**: Decompose an oversized RFE into right-sized pieces with user guidance. Runs review on new RFEs and checks for scope coverage gaps.
-4. **Submit**: Creates new RHAIRFE tickets or updates existing ones in Jira.
-5. **Strat Create**: Clone approved RFEs to RHAISTRAT in Jira.
-6. **Strat Refine**: Add the HOW — technical approach, dependencies, components, non-functionals.
-7. **Strat Review**: Four independent forked reviewers (feasibility, testability, scope, architecture).
-8. **Strat Prioritize**: Place new strategies in the existing backlog ordering.
-
-## Editing Between Steps
-
-All artifacts are written to `artifacts/`. You can edit any file between steps:
-
-- Edit an RFE in `artifacts/rfe-tasks/RFE-001-*.md`, then re-run `/rfe.review`
-- Re-run `/rfe.create` to start over from scratch
+```
+rfe-creator/
+├── .claude-plugin/
+│   └── plugin.json          # Plugin manifest
+├── .mcp.json                # Atlassian MCP server config
+├── skills/                  # Skill definitions
+│   ├── rfe.create/          # Create RFEs
+│   ├── rfe.review/          # Review and revise RFEs
+│   ├── rfe.split/           # Split oversized RFEs
+│   ├── rfe.submit/          # Submit to Jira
+│   ├── rfe.speedrun/        # Full pipeline
+│   ├── rfe-feasibility-review/  # Technical feasibility (forked)
+│   ├── strat.create/        # Clone to RHAISTRAT
+│   ├── strat.refine/        # Add technical approach
+│   ├── strat.review/        # Adversarial review
+│   ├── strat.prioritize/    # Backlog ordering
+│   ├── feasibility-review/  # Strategy feasibility
+│   ├── testability-review/  # Strategy testability
+│   ├── scope-review/        # Strategy scope
+│   ├── architecture-review/ # Strategy architecture
+│   └── rfe-creator.update-deps/  # Update vendored deps
+├── scripts/                 # Python utilities
+└── CLAUDE.md                # Artifact conventions and Jira mappings
+```
 
 ## assess-rfe Integration
 
@@ -86,7 +119,3 @@ Run `/rfe-creator.update-deps` to force-refresh to the latest version.
 ## Architecture Context
 
 For RHOAI work, the technical feasibility and strategy reviews use architecture context from [opendatahub-io/architecture-context](https://github.com/opendatahub-io/architecture-context). This is fetched automatically via sparse checkout on first use.
-
-## Jira MCP
-
-If the Atlassian MCP server is configured, `/rfe.submit` creates or updates tickets directly. Without it, the skill produces a formatted submission guide for manual entry.

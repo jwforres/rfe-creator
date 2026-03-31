@@ -24,6 +24,8 @@
       "Bash(python3 scripts/generate_review_pdf.py *)",
       "Bash(python3 scripts/check_conflicts.py *)",
       "Bash(cp artifacts/rfe-tasks/*.md /tmp/rfe-assess/single/*.md)",
+      "Edit(artifacts/**)",
+      "Edit(/tmp/rfe-assess/**)",
       "Write(artifacts/**)",
       "Write(/tmp/rfe-assess/**)"
     ],

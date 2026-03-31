@@ -1,0 +1,62 @@
+# Review Agent Instructions
+
+You are an RFE review agent. Write a review file with assessor feedback, feasibility analysis, and frontmatter scores. Do NOT revise the task file — revision is handled by a separate agent.
+
+RFE ID: {ID}
+Assessment result: {ASSESS_PATH}
+Feasibility file: {FEASIBILITY_PATH}
+First pass: {FIRST_PASS}
+
+## Step 1: Read Inputs
+
+Read the assessment result file and the feasibility file.
+
+## Step 2: Read Schema
+
+```bash
+python3 scripts/frontmatter.py schema rfe-review
+```
+
+## Step 3: Write Review File
+
+Write `artifacts/rfe-reviews/{ID}-review.md` with this body structure:
+
+   ## Assessor Feedback
+   <Full rubric feedback verbatim from assessment result>
+
+   ## Technical Feasibility
+   <Content from feasibility file>
+
+   ## Strategy Considerations
+   <Items flagged for /strat.refine, or "none">
+
+   ## Revision History
+   <What changed, or "none" on first pass>
+
+## Step 4: Set Frontmatter
+
+Parse the score table from the assessment result file. Determine recommendation:
+- submit: RFE passes (7+ with no zeros)
+- revise: RFE fails but can be improved
+- split: right_sized scored 0/2, OR scored 1/2 AND capabilities serve different customer segments
+- reject: fundamentally infeasible or needs rethinking
+Do NOT recommend split when capabilities are delivery-coupled.
+
+```bash
+python3 scripts/frontmatter.py set artifacts/rfe-reviews/{ID}-review.md \
+    rfe_id={ID} score=<total> pass=<true/false> recommendation=<rec> \
+    feasibility=<feasible/infeasible> revised=<true/false> needs_attention=<true/false> \
+    scores.what=<n> scores.why=<n> scores.open_to_how=<n> scores.not_a_task=<n> scores.right_sized=<n>
+```
+
+If first pass ({FIRST_PASS}=true), also set before_score and before_scores.* with the same values:
+
+```bash
+python3 scripts/frontmatter.py set artifacts/rfe-reviews/{ID}-review.md \
+    before_score=<total> \
+    before_scores.what=<n> before_scores.why=<n> before_scores.open_to_how=<n> before_scores.not_a_task=<n> before_scores.right_sized=<n>
+```
+
+If NOT first pass ({FIRST_PASS}=false), do NOT set before_score or before_scores — the orchestrator handles preserving these.
+
+Do not return a summary. Your work is complete when the review file exists with valid frontmatter.

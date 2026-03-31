@@ -1,74 +1,147 @@
 ---
 name: rfe.speedrun
-description: Write, review, and submit an RFE end-to-end with minimal interaction. Pass an idea to create from scratch, or a Jira key (e.g., RHAIRFE-1234) to review, improve, and update an existing RFE.
+description: End-to-end RFE pipeline. Accepts a single idea, Jira key(s), or a YAML batch file. Creates, reviews, auto-fixes (with splits), and submits. Supports --headless and --dry-run for CI.
 user-invocable: true
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion, Skill
 ---
 
-You are running the full RFE pipeline in speedrun mode. Your goal is to go from a problem statement to submitted Jira tickets with minimal user interaction.
+You are running the full RFE pipeline in speedrun mode. Your goal is to go from problem statements to submitted Jira tickets with minimal interaction. You orchestrate by calling other skills — never duplicate their work.
+
+## Step 0: Parse Arguments and Persist Flags
+
+Parse `$ARGUMENTS` for:
+- `--input <path>`: Path to a YAML file with batch entries
+- `--headless`: Suppress questions and confirmations (for CI / eval)
+- `--dry-run`: Skip Jira writes in submit
+- `--batch-size N`: Override batch size (default 5), passed to auto-fix
+- Remaining arguments: either a single Jira key (RHAIRFE-NNNN) or a free-text idea
+
+Clean temp state and persist parsed flags:
+
+```bash
+rm -rf tmp/ && mkdir -p tmp && cat > tmp/speedrun-config.yaml << 'EOF'
+headless: <true/false>
+dry_run: <true/false>
+batch_size: <N>
+input_file: <path or null>
+EOF
+```
+
+Determine pipeline mode:
+- **Mode A (Batch YAML)**: `--input` flag present → batch create + auto-fix + submit
+- **Mode B (Existing RFE)**: argument is a Jira key (RHAIRFE-NNNN) → skip create, auto-fix + submit
+- **Mode C (Single idea)**: free-text argument, no `--input` → single create + auto-fix + submit
+
+If no arguments provided, stop with usage instructions.
 
 ## Defaults
 
 When the user doesn't specify, use these defaults:
 - **Priority**: Normal
 - **Size**: S or M (unless the input clearly describes a large initiative)
-- **RFE count**: Single RFE, unless the input describes multiple distinct business needs
-- **Labels**: None unless the user specifies
+- **RFE count**: Single RFE per entry, unless an entry describes multiple distinct business needs
+- **Labels**: None unless specified
 
-## Pipeline
+## Phase 1: Create
 
-Check if `$ARGUMENTS` contains a Jira key (e.g., `RHAIRFE-1234`). This determines the pipeline mode.
+**Mode A (Batch YAML)**: Read the YAML input file. Format:
 
-### Mode A: New RFE (no Jira key)
+```yaml
+- prompt: "Users need to verify model signatures at serving time"
+  priority: Critical
+  labels: [candidate-3.5]
+- prompt: "TrustyAI operator crashes on large clusters"
+  priority: Major
+```
 
-#### Phase 1: Create
+For each entry, invoke `/rfe.create` as an inline Skill:
 
-Run `/rfe.create` with the user's input. Ask only the questions you cannot reasonably infer:
-- **Always ask**: Who are the affected customers? What is the business justification?
-- **Ask if unclear**: Is this one need or multiple? What does success look like?
-- **Never ask**: Implementation details, architecture, technology choices
+```
+/rfe.create --headless [--priority <priority>] [--labels <labels>] <prompt>
+```
 
-Limit to 2-5 questions total across the entire run.
+Collect all created RFE IDs from the output. Continue to Phase 2.
 
-#### Phase 2: Review
+**Mode B (Existing RFE)**: Skip Phase 1. The Jira key(s) from arguments become the processing list.
 
-Run `/rfe.review` on the produced artifacts.
+**Mode C (Single idea)**: Invoke `/rfe.create` with the user's input:
 
-### Mode B: Existing RFE (Jira key provided)
+```
+/rfe.create [--headless] <idea_text>
+```
 
-#### Phase 1: Skip Create
+If not headless, `/rfe.create` will ask clarifying questions. Collect created RFE IDs.
 
-Do not run `/rfe.create`. The RFE already exists in Jira.
+## Phase 2: Auto-fix
 
-#### Phase 2: Review
+Build the auto-fix command with all created/provided IDs:
 
-Run `/rfe.review $ARGUMENTS` — this fetches the RFE from Jira, reviews it, and auto-revises.
+```
+/rfe.auto-fix [--headless] [--batch-size N] <all_IDs>
+```
 
-**If all RFEs pass** (rubric >= 7/10 with no zeros, feasibility is feasible): proceed to Phase 3.
+Pass `--headless` through if set. Pass `--batch-size` if provided.
 
-**If any RFE fails**: Auto-revise the failing RFEs using the review feedback. Read the review files in `artifacts/rfe-reviews/`, identify the specific issues, edit the RFE artifact files to address them, then re-run `/rfe.review`.
+Auto-fix handles: assessment, feasibility checks, review, auto-revision, re-assessment, splitting oversized RFEs, retry queue, and report generation. Wait for it to complete.
 
-**Revision limits**:
-- Maximum 2 revision cycles
-- If RFEs still fail after 2 cycles, stop and present the review results to the user
-- Tell them: "These RFEs need manual attention. Run `/rfe.review` after editing to continue."
+## Phase 3: Submit
 
-### Phase 3: Submit
+Re-read flags (in case context was compressed):
 
-Run `/rfe.submit`. Present the confirmation table to the user before creating or updating tickets — this is the one mandatory interaction point.
+```bash
+cat tmp/speedrun-config.yaml
+```
 
-## Output
+Collect passing IDs:
 
-At the end, summarize what happened:
+```bash
+python3 scripts/collect_recommendations.py <all_IDs>
+```
+
+Parse the `SUBMIT=` line for IDs ready to submit.
+
+If no IDs are ready to submit, skip to Phase 4.
+
+If IDs are ready:
+
+```
+/rfe.submit [--dry-run] <passing_IDs>
+```
+
+If not headless: `/rfe.submit` will show a confirmation table before writing to Jira — this is the one mandatory interaction point.
+
+If headless: pass `--headless` so submit skips confirmation.
+
+## Phase 4: Summary
+
+Re-read flags:
+
+```bash
+cat tmp/speedrun-config.yaml
+```
+
+If headless, output a brief machine-readable summary. If interactive, output:
 
 ```
 ## Speedrun Complete
 
-<Created/Updated> N RFEs:
-- RHAIRFE-NNNN: <title> (Priority: Normal)
+### Created
+- RFE-NNN: <title> (Priority: Normal)
 
-Review cycles: N
-Artifacts: artifacts/rfes.md, artifacts/rfe-tasks/, artifacts/rfe-reviews/
+### Review Results
+- Passed: N
+- Failed: N
+- Split: N (into M children)
+
+### Submitted
+- RHAIRFE-NNNN: <title> [created/updated/dry-run]
+
+### Reports
+- Run report: artifacts/auto-fix-runs/<timestamp>.yaml
+- Review report: artifacts/auto-fix-runs/<timestamp>-report.html
+
+### Remaining Issues
+<Any RFEs that could not be auto-fixed, or "None">
 ```
 
 $ARGUMENTS

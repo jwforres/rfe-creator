@@ -3,7 +3,7 @@ name: feasibility-review
 description: Reviews strategy features for technical feasibility, implementation complexity, and effort estimate credibility.
 context: fork
 allowed-tools: Read, Grep, Glob
-model: sonnet
+model: opus
 user-invocable: false
 ---
 

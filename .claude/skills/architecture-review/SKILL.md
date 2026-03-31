@@ -3,7 +3,7 @@ name: architecture-review
 description: Reviews strategy features for architectural correctness — dependencies, integration patterns, component interactions.
 context: fork
 allowed-tools: Read, Grep, Glob
-model: sonnet
+model: opus
 user-invocable: false
 ---
 

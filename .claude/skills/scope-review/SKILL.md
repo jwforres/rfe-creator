@@ -3,7 +3,7 @@ name: scope-review
 description: Reviews strategy features for scope — is each strategy right-sized, does the effort match the scope, should anything be split?
 context: fork
 allowed-tools: Read, Grep, Glob
-model: sonnet
+model: opus
 user-invocable: false
 ---
 

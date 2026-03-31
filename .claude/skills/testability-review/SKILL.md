@@ -3,7 +3,7 @@ name: testability-review
 description: Reviews strategy features for testability — are acceptance criteria measurable, are edge cases covered, can this be validated?
 context: fork
 allowed-tools: Read, Grep, Glob
-model: sonnet
+model: opus
 user-invocable: false
 ---
 

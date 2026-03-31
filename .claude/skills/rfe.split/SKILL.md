@@ -22,7 +22,7 @@ For each ID, verify the task file exists via Glob (`artifacts/rfe-tasks/<ID>.md`
 For each ID, launch a **split agent** (model: opus, run_in_background: true):
 
 ```
-Read /Users/jforrest/rfe-creator/.claude/skills/rfe.split/prompts/split-agent.md and follow all instructions. Substitute: {ID}=<ID>, {TASK_FILE}=artifacts/rfe-tasks/<ID>.md, {REVIEW_FILE}=artifacts/rfe-reviews/<ID>-review.md
+Read .claude/skills/rfe.split/prompts/split-agent.md and follow all instructions. Substitute: {ID}=<ID>, {TASK_FILE}=artifacts/rfe-tasks/<ID>.md, {REVIEW_FILE}=artifacts/rfe-reviews/<ID>-review.md
 ```
 
 Launch all split agents in parallel.
@@ -87,7 +87,7 @@ Rebuild the index once:
 python3 scripts/frontmatter.py rebuild-index
 ```
 
-**If `--headless` was set**: Stop here. Do not output any summary.
+**If `--headless` was set**: Stop here. Do not output any summary. **Resume the calling skill's next step immediately.**
 
 **If interactive (no `--headless`)**: Present the final state for each parent ID:
 

@@ -22,7 +22,7 @@ For each ID, check if `artifacts/rfe-tasks/<id>.md` already exists locally (use 
 For each remote ID, launch a **fetch agent** (model: sonnet, run_in_background: true):
 
 ```
-Read /Users/jforrest/rfe-creator/.claude/skills/rfe.review/prompts/fetch-agent.md and follow all instructions. Substitute {KEY} with <ID> throughout.
+Read .claude/skills/rfe.review/prompts/fetch-agent.md and follow all instructions. Substitute {KEY} with <ID> throughout.
 ```
 
 Poll for completion every 60 seconds:
@@ -72,13 +72,13 @@ cp artifacts/rfe-tasks/<ID>.md /tmp/rfe-assess/single/<ID>.md
 **Launch assess agent** (model: opus, run_in_background: true):
 
 ```
-Read /Users/jforrest/rfe-creator/.claude/skills/rfe.review/prompts/assess-agent.md and follow all instructions. Substitute: {KEY}=<ID>, {DATA_FILE}=/tmp/rfe-assess/single/<ID>.md, {RUN_DIR}=/tmp/rfe-assess/single, {PROMPT_PATH}=/Users/jforrest/rfe-creator/.context/assess-rfe/scripts/agent_prompt.md
+Read .claude/skills/rfe.review/prompts/assess-agent.md and follow all instructions. Substitute: {KEY}=<ID>, {DATA_FILE}=/tmp/rfe-assess/single/<ID>.md, {RUN_DIR}=/tmp/rfe-assess/single, {PROMPT_PATH}=.context/assess-rfe/scripts/agent_prompt.md
 ```
 
-**Launch feasibility agent** (model: sonnet, run_in_background: true):
+**Launch feasibility agent** (model: sonnet, run_in_background: true) — one per ID:
 
 ```
-Read the skill file at .claude/skills/rfe-feasibility-review/SKILL.md and follow all instructions in the body (everything after the YAML frontmatter). Also read any artifacts/rfe-tasks/*-comments.md files for stakeholder context.
+Read the skill file at .claude/skills/rfe-feasibility-review/SKILL.md and follow all instructions in the body (everything after the YAML frontmatter). The RFE ID to review is: <ID>
 ```
 
 Launch all agents for all IDs in parallel (2N agents total for N IDs).
@@ -100,15 +100,15 @@ After completion, check prerequisites for each ID via Glob:
 - If feasibility file (`artifacts/rfe-reviews/<ID>-feasibility.md`) is missing → write error: `feasibility_failed`
 - If either is missing for an ID, write the error to review frontmatter and remove from processing list
 
-## Step 3: Launch Review-and-Revise Agents
+## Step 3: Launch Review Agents
 
-For each remaining ID, launch a **review-and-revise agent** (model: opus, run_in_background: true):
+For each remaining ID, launch a **review agent** (model: opus, run_in_background: true):
 
 ```
-Read /Users/jforrest/rfe-creator/.claude/skills/rfe.review/prompts/review-and-revise-agent.md and follow all instructions. Substitute: {ID}=<ID>, {ASSESS_PATH}=/tmp/rfe-assess/single/<ID>.result.md, {FEASIBILITY_PATH}=artifacts/rfe-reviews/<ID>-feasibility.md, {FIRST_PASS}=true
+Read .claude/skills/rfe.review/prompts/review-and-revise-agent.md and follow all instructions. Substitute: {ID}=<ID>, {ASSESS_PATH}=/tmp/rfe-assess/single/<ID>.result.md, {FEASIBILITY_PATH}=artifacts/rfe-reviews/<ID>-feasibility.md, {FIRST_PASS}=true
 ```
 
-Launch all review-and-revise agents in parallel.
+Launch all review agents in parallel.
 
 Poll for completion every 60 seconds:
 
@@ -116,11 +116,47 @@ Poll for completion every 60 seconds:
 python3 scripts/check_review_progress.py --phase review <all_IDs>
 ```
 
-Wait for all to complete. For any ID where the review file is missing or has no frontmatter, write error: `revise_failed`.
+Wait for all to complete. For any ID where the review file is missing or has no frontmatter, write error: `review_failed`.
+
+## Step 3.5: Launch Revise Agents
+
+After all review agents complete, determine which IDs need revision. For each ID, read review frontmatter:
+
+```bash
+python3 scripts/frontmatter.py read artifacts/rfe-reviews/<ID>-review.md
+```
+
+Launch a **revise agent** (model: opus, run_in_background: true) for each ID where `pass=false` and `feasibility` is not `infeasible`:
+
+```
+Read .claude/skills/rfe.review/prompts/revise-agent.md and follow all instructions. Substitute: {ID}=<ID>
+```
+
+Launch all revise agents in parallel.
+
+Poll for completion every 60 seconds:
+
+```bash
+python3 scripts/check_review_progress.py --phase revise <all_IDs_being_revised>
+```
+
+Wait for all to complete.
+
+**Post-processing: fix revised flag.** The revise agent may run out of budget before setting `revised=true`. After all agents complete, for each revised ID, verify the flag is correct:
+
+```bash
+python3 scripts/check_revised.py artifacts/rfe-originals/<ID>.md artifacts/rfe-tasks/<ID>.md
+```
+
+If the script reports files differ and frontmatter shows `revised=false`, fix it:
+
+```bash
+python3 scripts/frontmatter.py set artifacts/rfe-reviews/<ID>-review.md revised=true
+```
 
 ## Step 4: Re-assess if Revised (max 2 cycles)
 
-After all review-and-revise agents complete, check which IDs need re-assessment:
+After all revise agents complete, check which IDs need re-assessment:
 
 ```bash
 python3 scripts/collect_recommendations.py --reassess <all_IDs>
@@ -128,10 +164,25 @@ python3 scripts/collect_recommendations.py --reassess <all_IDs>
 
 Parse output for `REASSESS=` line. For each ID needing re-assessment (revised=true, pass=false), and this is cycle 1:
 
-1. Re-run assessment: prep_single, cp, launch assess agent (background)
-2. Wait for all re-assess agents to complete
-3. Launch review-and-revise agents again with `{FIRST_PASS}=false`
-4. Wait for all to complete
+1. Save cumulative state and remove review files so progress detection works:
+
+```bash
+python3 scripts/preserve_review_state.py save <all_reassess_IDs>
+rm artifacts/rfe-reviews/<ID>-review.md  # for each reassess ID
+```
+
+2. Re-run assessment: prep_single, cp, launch assess agent (background)
+3. Wait for all re-assess agents to complete
+4. Launch review agents again with `{FIRST_PASS}=false`
+5. Wait for all review agents to complete (file existence check works because review files were removed)
+6. Restore before_scores and revision history:
+
+```bash
+python3 scripts/preserve_review_state.py restore <all_reassess_IDs>
+```
+
+7. Launch revise agents for IDs where `pass=false` and `feasibility` is not `infeasible`
+8. Wait for all revise agents to complete, run post-processing revised flag fix
 
 After cycle 2, stop regardless of results.
 
@@ -143,7 +194,7 @@ Rebuild the index once:
 python3 scripts/frontmatter.py rebuild-index
 ```
 
-**If `--headless` was set**: Stop here. Do not output any summary. The calling orchestrator handles reporting.
+**If `--headless` was set**: Stop here. Do not output any summary. The calling orchestrator handles reporting. **Resume the calling skill's next step immediately.**
 
 **If interactive (no `--headless`)**: Read results and present summary:
 

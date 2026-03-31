@@ -20,13 +20,8 @@ Parse `$ARGUMENTS` for:
 Clean temp state and persist parsed flags:
 
 ```bash
-rm -rf tmp/ && mkdir -p tmp && cat > tmp/speedrun-config.yaml << 'EOF'
-headless: <true/false>
-announce_complete: <true/false>
-dry_run: <true/false>
-batch_size: <N>
-input_file: <path or null>
-EOF
+python3 scripts/state.py clean
+python3 scripts/state.py init tmp/speedrun-config.yaml headless=<true/false> announce_complete=<true/false> dry_run=<true/false> batch_size=<N> input_file=<path or null>
 ```
 
 Determine pipeline mode:
@@ -62,7 +57,7 @@ For each entry, invoke `/rfe.create` as an inline Skill:
 /rfe.create --headless [--priority <priority>] [--labels <labels>] <prompt>
 ```
 
-Collect all created RFE IDs from the output. Continue to Phase 2.
+Collect all created RFE IDs from the output.
 
 **Mode B (Existing RFE)**: Skip Phase 1. The Jira key(s) from arguments become the processing list.
 
@@ -74,12 +69,25 @@ Collect all created RFE IDs from the output. Continue to Phase 2.
 
 If not headless, `/rfe.create` will ask clarifying questions. Collect created RFE IDs.
 
+After Phase 1 (all modes), persist the ID list to disk:
+
+```bash
+python3 scripts/state.py write-ids tmp/speedrun-all-ids.txt <all_IDs>
+```
+
 ## Phase 2: Auto-fix
 
-Build the auto-fix command with all created/provided IDs:
+Re-read config and ID list from disk (in case context was compressed during Phase 1):
+
+```bash
+python3 scripts/state.py read tmp/speedrun-config.yaml
+python3 scripts/state.py read-ids tmp/speedrun-all-ids.txt
+```
+
+Build the auto-fix command using flags from the config file:
 
 ```
-/rfe.auto-fix [--headless] [--announce-complete] [--batch-size N] <all_IDs>
+/rfe.auto-fix [--headless] [--announce-complete] [--batch-size N] <all_IDs_from_file>
 ```
 
 Pass `--headless` and `--announce-complete` through if set. Pass `--batch-size` if provided.
@@ -91,13 +99,19 @@ Auto-fix handles: assessment, feasibility checks, review, auto-revision, re-asse
 Re-read flags (in case context was compressed):
 
 ```bash
-cat tmp/speedrun-config.yaml
+python3 scripts/state.py read tmp/speedrun-config.yaml
+```
+
+Re-read ID list from disk:
+
+```bash
+python3 scripts/state.py read-ids tmp/speedrun-all-ids.txt
 ```
 
 Collect passing IDs:
 
 ```bash
-python3 scripts/collect_recommendations.py <all_IDs>
+python3 scripts/collect_recommendations.py <all_IDs_from_file>
 ```
 
 Parse the `SUBMIT=` line for IDs ready to submit.
@@ -119,7 +133,7 @@ If headless: pass `--headless` so submit skips confirmation.
 Re-read flags:
 
 ```bash
-cat tmp/speedrun-config.yaml
+python3 scripts/state.py read tmp/speedrun-config.yaml
 ```
 
 If headless, output a brief machine-readable summary. If interactive, output:

@@ -16,12 +16,16 @@ Parse `$ARGUMENTS` for flags and IDs:
 Persist parsed flags (survives context compression):
 
 ```bash
-mkdir -p tmp && cat > tmp/split-config.yaml << 'EOF'
-headless: <true/false>
-EOF
+python3 scripts/state.py init tmp/split-config.yaml headless=<true/false>
 ```
 
 If no arguments provided, stop with: "Usage: `/rfe.split <ID> [ID2 ...]`. Provide one or more RFE IDs."
+
+Persist all IDs to disk (survives context compression):
+
+```bash
+python3 scripts/state.py write-ids tmp/split-all-ids.txt <all_IDs>
+```
 
 For each ID, verify the task file exists via Glob (`artifacts/rfe-tasks/<ID>.md`). If missing, report and skip.
 
@@ -38,7 +42,7 @@ Launch all split agents in parallel.
 Write IDs to poll file once, then poll using `NEXT_POLL` interval:
 
 ```bash
-echo "<all_IDs>" > tmp/rfe-poll-split.txt
+python3 scripts/state.py write-ids tmp/rfe-poll-split.txt <all_IDs>
 python3 scripts/check_review_progress.py --phase split --id-file tmp/rfe-poll-split.txt
 ```
 
@@ -51,6 +55,12 @@ python3 scripts/frontmatter.py set artifacts/rfe-reviews/<ID>-review.md error="s
 ```
 
 ## Step 2: Collect Children and Review
+
+Re-read parent IDs from disk (context compression may have corrupted in-memory lists):
+
+```bash
+python3 scripts/state.py read-ids tmp/split-all-ids.txt
+```
 
 For each ID, read `artifacts/rfe-reviews/<ID>-split-status.yaml`. If `action: no-split`, update the review recommendation so downstream consumers don't treat it as needing a split:
 
@@ -76,7 +86,25 @@ This triggers the full agent delegation review pipeline on all children.
 
 ## Step 3: Right-sizing Self-Correction (up to 3 cycles)
 
-After `/rfe.review` completes on children, check right-sized scores. For each child:
+Initialize the correction cycle counter on disk:
+
+```bash
+python3 scripts/state.py set tmp/split-config.yaml correction_cycle=0
+```
+
+After `/rfe.review` completes on children, re-read config and parent IDs (context compression may have lost them):
+
+```bash
+python3 scripts/state.py read tmp/split-config.yaml
+```
+
+If `correction_cycle` is 3 or higher, stop and report remaining right-sizing concerns. Otherwise, re-derive child IDs:
+
+```bash
+python3 scripts/collect_children.py $(python3 scripts/state.py read-ids tmp/split-all-ids.txt)
+```
+
+Check right-sized scores. For each child:
 
 ```bash
 python3 scripts/frontmatter.py read artifacts/rfe-reviews/<child_ID>-review.md
@@ -90,7 +118,13 @@ If any child scores below 2/2 on `scores.right_sized`:
 4. **Review new children**: Invoke `/rfe.review [--headless] <new_child_IDs>`
 5. **Check again**: Read right-sized scores for new children
 
-Repeat up to 3 cycles total. After 3 cycles, stop and report remaining right-sizing concerns.
+After each cycle, increment the counter on disk:
+
+```bash
+python3 scripts/state.py set tmp/split-config.yaml correction_cycle=<N+1>
+```
+
+Re-read config before starting the next cycle to check the counter. Stop after 3 cycles and report remaining right-sizing concerns.
 
 **Do not re-split for non-Right-sized criteria.** This loop only corrects grouping mistakes caught by the Right-sized score. Other criteria are handled by `/rfe.review`'s auto-revision.
 
@@ -105,7 +139,7 @@ python3 scripts/frontmatter.py rebuild-index
 Re-read flags (in case context was compressed):
 
 ```bash
-cat tmp/split-config.yaml
+python3 scripts/state.py read tmp/split-config.yaml
 ```
 
 **If `headless: true`**: Stop here. Do not output any summary. **Resume the calling skill's next step immediately.**

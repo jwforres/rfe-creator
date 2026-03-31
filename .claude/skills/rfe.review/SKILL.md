@@ -16,9 +16,13 @@ Parse `$ARGUMENTS` for flags and IDs:
 Persist parsed flags (survives context compression):
 
 ```bash
-mkdir -p tmp && cat > tmp/review-config.yaml << 'EOF'
-headless: <true/false>
-EOF
+python3 scripts/state.py init tmp/review-config.yaml headless=<true/false>
+```
+
+Persist all IDs to disk (survives context compression):
+
+```bash
+python3 scripts/state.py write-ids tmp/review-all-ids.txt <all_IDs>
 ```
 
 For each ID, check if `artifacts/rfe-tasks/<id>.md` already exists locally (use Glob, don't read the file). Separate IDs into:
@@ -36,7 +40,7 @@ Read .claude/skills/rfe.review/prompts/fetch-agent.md and follow all instruction
 Write IDs to poll file once, then poll using `NEXT_POLL` interval:
 
 ```bash
-echo "<all_remote_IDs>" > tmp/rfe-poll-fetch.txt
+python3 scripts/state.py write-ids tmp/rfe-poll-fetch.txt <all_remote_IDs>
 python3 scripts/check_review_progress.py --phase fetch --id-file tmp/rfe-poll-fetch.txt
 ```
 
@@ -95,8 +99,8 @@ Launch all agents for all IDs in parallel (2N agents total for N IDs).
 Write IDs to poll files once, then poll every 60 seconds:
 
 ```bash
-echo "<all_IDs>" > tmp/rfe-poll-assess.txt
-echo "<all_IDs>" > tmp/rfe-poll-feasibility.txt
+python3 scripts/state.py write-ids tmp/rfe-poll-assess.txt <all_IDs>
+python3 scripts/state.py write-ids tmp/rfe-poll-feasibility.txt <all_IDs>
 python3 scripts/check_review_progress.py --phase assess --id-file tmp/rfe-poll-assess.txt
 python3 scripts/check_review_progress.py --phase feasibility --id-file tmp/rfe-poll-feasibility.txt
 ```
@@ -121,7 +125,7 @@ Launch all review agents in parallel.
 Write IDs to poll file once, then poll using `NEXT_POLL` interval:
 
 ```bash
-echo "<all_IDs>" > tmp/rfe-poll-review.txt
+python3 scripts/state.py write-ids tmp/rfe-poll-review.txt <all_IDs>
 python3 scripts/check_review_progress.py --phase review --id-file tmp/rfe-poll-review.txt
 ```
 
@@ -129,10 +133,16 @@ Sleep for the `NEXT_POLL` seconds reported by the script before polling again. W
 
 ## Step 3.5: Launch Revise Agents
 
-After all review agents complete, determine which IDs need revision:
+After all review agents complete, re-read the ID list from disk (context compression may have corrupted in-memory lists):
 
 ```bash
-python3 scripts/filter_for_revision.py <all_IDs>
+python3 scripts/state.py read-ids tmp/review-all-ids.txt
+```
+
+Determine which IDs need revision:
+
+```bash
+python3 scripts/filter_for_revision.py <all_IDs_from_file>
 ```
 
 The script outputs the IDs that need revision (filters out passing, infeasible, and rejected IDs). If the output is empty, skip to Step 4.
@@ -148,13 +158,19 @@ Launch all revise agents in parallel.
 Write IDs to poll file once, then poll using `NEXT_POLL` interval:
 
 ```bash
-echo "<all_IDs_being_revised>" > tmp/rfe-poll-revise.txt
+python3 scripts/state.py write-ids tmp/rfe-poll-revise.txt <all_IDs_being_revised>
 python3 scripts/check_review_progress.py --phase revise --id-file tmp/rfe-poll-revise.txt
 ```
 
 Sleep for the `NEXT_POLL` seconds reported by the script before polling again. Wait for all to complete.
 
-**Post-processing: fix revised flag.** The revise agent may run out of budget before setting `revised=true`. After all agents complete, for each revised ID, verify the flag is correct:
+**Post-processing: fix revised flag.** The revise agent may run out of budget before setting `revised=true`. After all agents complete, re-read the revised ID list from the poll file (compression may have lost them during agent execution):
+
+```bash
+python3 scripts/state.py read-ids tmp/rfe-poll-revise.txt
+```
+
+For each revised ID, verify the flag is correct:
 
 ```bash
 python3 scripts/check_revised.py artifacts/rfe-originals/<ID>.md artifacts/rfe-tasks/<ID>.md
@@ -168,13 +184,43 @@ python3 scripts/frontmatter.py set artifacts/rfe-reviews/<ID>-review.md revised=
 
 ## Step 4: Re-assess if Revised (max 2 cycles)
 
+Re-read ID list from disk:
+
+```bash
+python3 scripts/state.py read-ids tmp/review-all-ids.txt
+```
+
 After all revise agents complete, check which IDs need re-assessment:
 
 ```bash
-python3 scripts/collect_recommendations.py --reassess <all_IDs>
+python3 scripts/collect_recommendations.py --reassess $(python3 scripts/state.py read-ids tmp/review-all-ids.txt)
 ```
 
-Parse output for `REASSESS=` line. For each ID needing re-assessment (revised=true, pass=false), and this is cycle 1:
+Parse output for `REASSESS=` line. For each ID needing re-assessment (revised=true, pass=false), track the current cycle number on disk:
+
+```bash
+python3 scripts/state.py set tmp/review-config.yaml reassess_cycle=1
+```
+
+Before starting a cycle, re-read the cycle counter to guard against context compression:
+
+```bash
+python3 scripts/state.py read tmp/review-config.yaml
+```
+
+If `reassess_cycle` already shows 2 or higher, stop — max cycles reached. Otherwise, increment after each cycle:
+
+```bash
+python3 scripts/state.py set tmp/review-config.yaml reassess_cycle=<N+1>
+```
+
+For cycle 1:
+
+Persist reassess IDs to disk (needed across 4a–4e, may be lost to compression during agents):
+
+```bash
+python3 scripts/state.py write-ids tmp/review-reassess-ids.txt <all_reassess_IDs>
+```
 
 **4a. Save cumulative state and remove review files** so progress detection works:
 
@@ -209,16 +255,20 @@ Read .claude/skills/rfe.review/prompts/review-and-revise-agent.md and follow all
 
 Launch all review agents in parallel. Wait for all to complete (file existence check works because review files were removed in 4a).
 
-**4d. Restore before_scores and revision history:**
+**4d. Restore before_scores and revision history.** Re-read reassess IDs from disk:
 
 ```bash
-python3 scripts/preserve_review_state.py restore <all_reassess_IDs>
+python3 scripts/state.py read-ids tmp/review-reassess-ids.txt
+```
+
+```bash
+python3 scripts/preserve_review_state.py restore <all_reassess_IDs_from_file>
 ```
 
 **4e. Filter for revision** (also catches score regressions and sets autorevise_reject):
 
 ```bash
-python3 scripts/filter_for_revision.py <all_reassess_IDs>
+python3 scripts/filter_for_revision.py <all_reassess_IDs_from_file>
 ```
 
 Launch revise agents for the IDs returned (if any). Wait for all to complete, run post-processing revised flag fix (same as Step 3.5).
@@ -236,15 +286,15 @@ python3 scripts/frontmatter.py rebuild-index
 Re-read flags (in case context was compressed):
 
 ```bash
-cat tmp/review-config.yaml
+python3 scripts/state.py read tmp/review-config.yaml
 ```
 
 **If `headless: true`**: Stop here. Do not output any summary. The calling orchestrator handles reporting. **Resume the calling skill's next step immediately.**
 
-**If interactive (no `--headless`)**: Read results and present summary:
+**If interactive (no `--headless`)**: Re-read ID list and present summary:
 
 ```bash
-python3 scripts/batch_summary.py <all_IDs>
+python3 scripts/batch_summary.py $(python3 scripts/state.py read-ids tmp/review-all-ids.txt)
 ```
 
 Based on the output:

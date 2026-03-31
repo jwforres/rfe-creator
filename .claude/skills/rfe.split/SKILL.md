@@ -52,13 +52,19 @@ python3 scripts/frontmatter.py set artifacts/rfe-reviews/<ID>-review.md error="s
 
 ## Step 2: Collect Children and Review
 
-For IDs where `split-status.yaml` has `action: split`, collect children:
+For each ID, read `artifacts/rfe-reviews/<ID>-split-status.yaml`. If `action: no-split`, update the review recommendation so downstream consumers don't treat it as needing a split:
+
+```bash
+python3 scripts/frontmatter.py set artifacts/rfe-reviews/<ID>-review.md recommendation=revise
+```
+
+For IDs where `action: split`, collect children:
 
 ```bash
 python3 scripts/collect_children.py <split_IDs>
 ```
 
-Parse the output to get all child RFE IDs.
+Parse the output to get all child RFE IDs. If any parent has zero children despite `action: split`, treat it as a no-split and update its recommendation to `revise`.
 
 If there are children to review, invoke `/rfe.review` as an inline Skill, passing `--headless` through if present:
 

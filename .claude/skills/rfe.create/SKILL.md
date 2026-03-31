@@ -62,9 +62,17 @@ Key rules:
 
 ## Step 4: Write Artifacts
 
-For each RFE, first write the markdown body to `artifacts/rfe-tasks/RFE-NNN-<slug>.md`, then set frontmatter using the CLI tool.
+For each RFE, allocate an ID first, then write the markdown body and set frontmatter.
 
-First, read the schema to know exact field names and allowed values:
+Allocate IDs atomically (prevents collisions with parallel runs):
+
+```bash
+python3 scripts/next_rfe_id.py <count>
+```
+
+This prints one `RFE-NNN` per line. Use these IDs for filenames: `artifacts/rfe-tasks/RFE-NNN-<slug>.md`.
+
+Read the schema to know exact field names and allowed values:
 
 ```bash
 python3 scripts/frontmatter.py schema rfe-task

@@ -99,8 +99,15 @@ Using the recommended decomposition:
    - Affected customers and segments
    - Priority (inherit from parent by default; differentiate only if clearly warranted)
    - If the original came from Jira, note the source key (e.g., `**Split from**: {ID}`)
-4. Number new RFEs sequentially after the highest existing RFE number in `artifacts/rfe-tasks/`
-5. Write each to `artifacts/rfe-tasks/RFE-NNN-<slug>.md`
+4. Allocate IDs atomically (prevents collisions with parallel split agents):
+
+```bash
+python3 scripts/next_rfe_id.py <number_of_children>
+```
+
+This prints one RFE-NNN ID per line. Use these IDs in order for your children. The script locks to prevent races — do NOT scan the directory yourself.
+
+5. Write each to `artifacts/rfe-tasks/RFE-NNN-<slug>.md` (rename the placeholder file created by the ID script)
 6. Set frontmatter on each child:
 
 ```bash

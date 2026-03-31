@@ -1,8 +1,7 @@
 ---
 name: rfe-feasibility-review
-description: Reviews RFEs for technical feasibility, blockers, and alignment with technical strategy. Runs in isolated context with architecture docs.
-context: fork
-allowed-tools: Read, Grep, Glob
+description: Reviews RFEs for technical feasibility, blockers, and alignment with technical strategy.
+allowed-tools: Read, Write, Grep, Glob, Bash
 model: sonnet
 user-invocable: false
 ---
@@ -34,7 +33,7 @@ If `artifacts/rfe-review-report.md` exists, read it. This is a re-review after r
 
 ## Output
 
-Write your assessment to stdout (the orchestrating skill will capture it). For each RFE:
+Write your assessment to `artifacts/rfe-reviews/{id}-feasibility.md` (one file per RFE). Create the directory if needed. For each RFE:
 
 ```
 ### RFE-NNN: <title>

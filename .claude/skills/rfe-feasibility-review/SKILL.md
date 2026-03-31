@@ -33,7 +33,7 @@ If `artifacts/rfe-review-report.md` exists, read it. This is a re-review after r
 
 ## Output
 
-Write your assessment to `artifacts/rfe-reviews/{ID}-feasibility.md`. Create the directory if needed.
+Write your assessment to `artifacts/rfe-reviews/{ID}-feasibility.md` where `{ID}` is exactly the RFE ID passed to you (e.g., `RFE-005` or `RHAIRFE-1234`). Do NOT include the slug from the task filename — the output must be `{ID}-feasibility.md`, not `{ID}-{slug}-feasibility.md`. Create the directory if needed.
 
 ```
 ### RFE-NNN: <title>

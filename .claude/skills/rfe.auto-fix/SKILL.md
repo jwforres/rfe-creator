@@ -178,4 +178,10 @@ Present consolidated results:
 <e.g., /rfe.submit for passing RFEs, manual edits for failures>
 ```
 
+If `--headless` was set, after outputting the final summary run:
+
+```bash
+python3 scripts/finish.py
+```
+
 $ARGUMENTS

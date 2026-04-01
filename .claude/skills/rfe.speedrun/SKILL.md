@@ -1,6 +1,6 @@
 ---
 name: rfe.speedrun
-description: End-to-end RFE pipeline. Accepts a single idea, Jira key(s), or a YAML batch file. Creates, reviews, auto-fixes (with splits), and submits. Supports --headless and --dry-run for CI.
+description: End-to-end RFE pipeline. Accepts a single idea, Jira key(s), or a YAML batch file. Creates, reviews, auto-fixes (with splits), and submits. Supports --headless, --announce-complete, and --dry-run for CI.
 user-invocable: true
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion, Skill
 ---
@@ -12,6 +12,7 @@ You are running the full RFE pipeline in speedrun mode. Your goal is to go from 
 Parse `$ARGUMENTS` for:
 - `--input <path>`: Path to a YAML file with batch entries
 - `--headless`: Suppress questions and confirmations (for CI / eval)
+- `--announce-complete`: Print completion marker when done (for CI / eval harnesses)
 - `--dry-run`: Skip Jira writes in submit
 - `--batch-size N`: Override batch size (default 5), passed to auto-fix
 - Remaining arguments: either a single Jira key (RHAIRFE-NNNN) or a free-text idea
@@ -21,6 +22,7 @@ Clean temp state and persist parsed flags:
 ```bash
 rm -rf tmp/ && mkdir -p tmp && cat > tmp/speedrun-config.yaml << 'EOF'
 headless: <true/false>
+announce_complete: <true/false>
 dry_run: <true/false>
 batch_size: <N>
 input_file: <path or null>
@@ -77,10 +79,10 @@ If not headless, `/rfe.create` will ask clarifying questions. Collect created RF
 Build the auto-fix command with all created/provided IDs:
 
 ```
-/rfe.auto-fix [--headless] [--batch-size N] <all_IDs>
+/rfe.auto-fix [--headless] [--announce-complete] [--batch-size N] <all_IDs>
 ```
 
-Pass `--headless` through if set. Pass `--batch-size` if provided.
+Pass `--headless` and `--announce-complete` through if set. Pass `--batch-size` if provided.
 
 Auto-fix handles: assessment, feasibility checks, review, auto-revision, re-assessment, splitting oversized RFEs, retry queue, and report generation. Wait for it to complete.
 

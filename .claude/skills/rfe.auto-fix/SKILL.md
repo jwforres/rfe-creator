@@ -14,6 +14,7 @@ Parse `$ARGUMENTS` for:
 - `--limit N`: Cap the number of IDs to process (useful for testing JQL queries)
 - `--batch-size N`: Override batch size (default: 5)
 - `--headless`: Suppress summaries (when called by speedrun)
+- `--announce-complete`: Print completion marker when done (for CI / eval harnesses)
 - Remaining arguments: explicit RFE IDs (RHAIRFE-NNNN)
 
 Persist parsed flags (survives context compression):
@@ -21,6 +22,7 @@ Persist parsed flags (survives context compression):
 ```bash
 mkdir -p tmp && cat > tmp/autofix-config.yaml << 'EOF'
 headless: <true/false>
+announce_complete: <true/false>
 batch_size: <N>
 EOF
 ```
@@ -180,6 +182,12 @@ Present consolidated results:
 
 ### Next Steps
 <e.g., /rfe.submit for passing RFEs, manual edits for failures>
+```
+
+If `--announce-complete` was set, after outputting the final summary run:
+
+```bash
+python3 scripts/finish.py
 ```
 
 $ARGUMENTS

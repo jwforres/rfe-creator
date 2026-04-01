@@ -67,7 +67,11 @@ Parse output for `PROCESS=` and `SKIP=` lines. Remove already-processed IDs (pas
 
 ## Step 3: Batch Processing
 
-Split remaining IDs into batches of `batch-size` (default 5). Record the start time for the run report.
+Split remaining IDs into batches of `batch-size` (default 5). Persist the start time so it survives context compression:
+
+```bash
+echo "start_time: $(python3 -c "from datetime import datetime,timezone; print(datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))")" >> tmp/autofix-config.yaml
+```
 
 For each batch:
 
@@ -139,16 +143,22 @@ python3 scripts/frontmatter.py set artifacts/rfe-reviews/<ID>-review.md error=nu
 
 ## Step 5: Generate Reports
 
-Generate the run report:
+Re-read persisted config to recover flags and start time after potential context compression:
+
+```bash
+cat tmp/autofix-config.yaml
+```
+
+Parse `start_time` from the output. Generate the run report:
 
 ```bash
 python3 scripts/generate_run_report.py --start-time "<start_time>" --batch-size <N> [--retried <retry_IDs>] [--retry-successes <success_IDs>] <all_IDs>
 ```
 
-Generate the HTML review report:
+Parse the `run_id` from the script output (format: `YYYYMMDD-HHMMSS`). Generate the HTML review report using that `run_id`:
 
 ```bash
-python3 scripts/generate_review_pdf.py --revised-only --output artifacts/auto-fix-runs/<timestamp>-report.html
+python3 scripts/generate_review_pdf.py --revised-only --output artifacts/auto-fix-runs/<run_id>-report.html
 ```
 
 ## Step 6: Final Summary
@@ -170,8 +180,8 @@ Present consolidated results:
 <output from batch_summary.py on all IDs>
 
 ### Reports
-- Run report: artifacts/auto-fix-runs/<timestamp>.yaml
-- Review report: artifacts/auto-fix-runs/<timestamp>-report.html
+- Run report: artifacts/auto-fix-runs/<run_id>.yaml
+- Review report: artifacts/auto-fix-runs/<run_id>-report.html
 
 ### Remaining Issues
 <Any issues that could not be auto-fixed, or "None">

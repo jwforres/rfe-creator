@@ -21,6 +21,7 @@
       "Bash(python3 scripts/compare_review_outputs.py *)",
       "Bash(python3 scripts/check_revised.py *)",
       "Bash(python3 scripts/preserve_review_state.py *)",
+      "Bash(python3 scripts/filter_for_revision.py *)",
       "Bash(python3 scripts/generate_review_pdf.py *)",
       "Bash(python3 scripts/check_conflicts.py *)",
       "Bash(cp artifacts/rfe-tasks/*.md /tmp/rfe-assess/single/*.md)",

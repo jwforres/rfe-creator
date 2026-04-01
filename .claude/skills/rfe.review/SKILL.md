@@ -176,31 +176,52 @@ python3 scripts/collect_recommendations.py --reassess <all_IDs>
 
 Parse output for `REASSESS=` line. For each ID needing re-assessment (revised=true, pass=false), and this is cycle 1:
 
-1. Save cumulative state and remove review files so progress detection works:
+**4a. Save cumulative state and remove review files** so progress detection works:
 
 ```bash
 python3 scripts/preserve_review_state.py save <all_reassess_IDs>
 rm artifacts/rfe-reviews/<ID>-review.md  # for each reassess ID
 ```
 
-2. Re-run assessment: prep_single, cp, launch assess agent (background)
-3. Wait for all re-assess agents to complete
-4. Launch review agents again with `{FIRST_PASS}=false`
-5. Wait for all review agents to complete (file existence check works because review files were removed)
-6. Restore before_scores and revision history:
+**4b. Re-run assessment.** For each reassess ID, prepare and launch an assess agent — this is the same process as Step 2:
+
+```bash
+python3 .context/assess-rfe/scripts/prep_single.py <ID>
+```
+
+```bash
+cp artifacts/rfe-tasks/<ID>.md /tmp/rfe-assess/single/<ID>.md
+```
+
+Launch an **assess agent** (model: opus, run_in_background: true) for each reassess ID:
+
+```
+Read .claude/skills/rfe.review/prompts/assess-agent.md and follow all instructions. Substitute: {KEY}=<ID>, {DATA_FILE}=/tmp/rfe-assess/single/<ID>.md, {RUN_DIR}=/tmp/rfe-assess/single, {PROMPT_PATH}=.context/assess-rfe/scripts/agent_prompt.md
+```
+
+Launch all assess agents in parallel. Wait for all to complete — verify `/tmp/rfe-assess/single/<ID>.result.md` exists for each.
+
+**4c. Launch review agents.** For each reassess ID, launch a **review agent** (model: opus, run_in_background: true):
+
+```
+Read .claude/skills/rfe.review/prompts/review-and-revise-agent.md and follow all instructions. Substitute: {ID}=<ID>, {ASSESS_PATH}=/tmp/rfe-assess/single/<ID>.result.md, {FEASIBILITY_PATH}=artifacts/rfe-reviews/<ID>-feasibility.md, {FIRST_PASS}=false
+```
+
+Launch all review agents in parallel. Wait for all to complete (file existence check works because review files were removed in 4a).
+
+**4d. Restore before_scores and revision history:**
 
 ```bash
 python3 scripts/preserve_review_state.py restore <all_reassess_IDs>
 ```
 
-7. Filter for revision (also catches score regressions and sets autorevise_reject):
+**4e. Filter for revision** (also catches score regressions and sets autorevise_reject):
 
 ```bash
 python3 scripts/filter_for_revision.py <all_reassess_IDs>
 ```
 
-Launch revise agents for the IDs returned (if any).
-8. Wait for all revise agents to complete, run post-processing revised flag fix
+Launch revise agents for the IDs returned (if any). Wait for all to complete, run post-processing revised flag fix (same as Step 3.5).
 
 After cycle 2, stop regardless of results.
 

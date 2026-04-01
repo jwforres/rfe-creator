@@ -40,7 +40,13 @@ If no IDs and no JQL query, stop with usage instructions.
 ```bash
 python3 scripts/state.py write-ids tmp/autofix-all-ids.txt <all_IDs>
 ```
+
+Output: `[AUTOFIX] Step 0: Parsed N IDs, batch_size=M`
+
 ## Step 1: Bootstrap Pre-flight
+
+Output: `[AUTOFIX] Step 1: Bootstrap`
+
 Run bootstrap once before any batching:
 
 ```bash
@@ -56,11 +62,17 @@ bash scripts/bootstrap-assess-rfe.sh
 If the retry also fails, stop entirely: "assess-rfe bootstrap failed — cannot proceed. Check network connectivity and retry."
 
 ## Step 2: Resume Check
+
+Output: `[AUTOFIX] Step 2: Resume Check`
+
 Re-read the ID list from disk (in case context was compressed):
 
 ```bash
 python3 scripts/state.py read-ids tmp/autofix-all-ids.txt
 ```
+
+Output: `[AUTOFIX] Recovered N IDs from autofix-all-ids.txt`
+
 Check which IDs are already processed:
 
 ```bash
@@ -68,6 +80,9 @@ python3 scripts/check_resume.py $(python3 scripts/state.py read-ids tmp/autofix-
 ```
 
 Parse output for `PROCESS=` and `SKIP=` lines. Remove already-processed IDs (pass=true, no error) from the processing list.
+
+Output: `[AUTOFIX] Step 2: N to process, M skipped`
+
 Persist the filtered processing list to disk (survives context compression):
 
 ```bash
@@ -81,7 +96,10 @@ Re-read the filtered ID list from disk (in case context was compressed):
 ```bash
 python3 scripts/state.py read-ids tmp/autofix-process-ids.txt
 ```
-Split remaining IDs into batches of `batch-size` (default 5).
+
+Output: `[AUTOFIX] Recovered N IDs from autofix-process-ids.txt`
+
+Split remaining IDs into batches of `batch-size` (default 5). Output: `[AUTOFIX] Step 3: Batch Processing (M batches of K)`
 
 Persist the start time, batch count, and per-batch ID lists so they survive context compression:
 
@@ -109,6 +127,9 @@ Re-read this batch's IDs from disk (do not use IDs from memory — they may be h
 ```bash
 python3 scripts/state.py read-ids tmp/autofix-batch-N-ids.txt
 ```
+
+Output: `[AUTOFIX] Batch N/M: K IDs`
+
 ### 3a: Review
 
 Invoke `/rfe.review` as an inline Skill, using IDs from the batch file:
@@ -159,24 +180,33 @@ Output a progress update:
 ```
 
 ## Step 4: Retry Queue
+
+Output: `[AUTOFIX] Step 4: Retry Queue`
+
 After all regular batches complete, re-read the full ID list from disk:
 
 ```bash
 python3 scripts/state.py read-ids tmp/autofix-all-ids.txt
 ```
+
+Output: `[AUTOFIX] Recovered N IDs from autofix-all-ids.txt`
+
 Scan ALL processed IDs for errors:
 
 ```bash
 python3 scripts/collect_recommendations.py <all_IDs_from_file>
 ```
 
-Parse the `ERRORS=` line. If empty, skip to Step 5.
+Parse the `ERRORS=` line. If empty, output `[AUTOFIX] Step 4: No errors, skipping retry` and skip to Step 5.
 
 If errors found, **persist retry IDs to disk** (do not rely on in-memory parsing — they may be lost to compression during the retry run):
 
 ```bash
 python3 scripts/state.py write-ids tmp/autofix-retry-ids.txt <error_IDs>
 ```
+
+Output: `[AUTOFIX] Step 4: Retrying N IDs: <error_IDs>`
+
 For each error ID:
 
 1. For IDs with `split_failed` errors: clean up first:
@@ -202,12 +232,18 @@ python3 scripts/state.py read-ids tmp/autofix-retry-ids.txt
 5. If they fail again, report as permanent failures
 
 ## Step 5: Generate Reports
+
+Output: `[AUTOFIX] Step 5: Generate Reports`
+
 Re-read persisted config and ID list to recover after potential context compression:
 
 ```bash
 python3 scripts/state.py read tmp/autofix-config.yaml
 python3 scripts/state.py read-ids tmp/autofix-all-ids.txt
 ```
+
+Output: `[AUTOFIX] Recovered N IDs from autofix-all-ids.txt`
+
 Parse `start_time` from the config. Use IDs from the file. Generate the run report:
 
 ```bash
@@ -221,6 +257,9 @@ python3 scripts/generate_review_pdf.py --revised-only --output artifacts/auto-fi
 ```
 
 ## Step 6: Final Summary
+
+Output: `[AUTOFIX] Step 6: Final Summary`
+
 Re-read config and IDs from disk (context compression may have lost flags like `announce_complete`):
 
 ```bash

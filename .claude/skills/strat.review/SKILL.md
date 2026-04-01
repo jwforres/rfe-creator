@@ -1,6 +1,6 @@
 ---
 name: strat.review
-description: Adversarial review of refined strategies. Runs independent forked reviewers for feasibility, testability, scope, and architecture.
+description: Adversarial review of refined strategies. Runs independent forked reviewers for feasibility, testability, scope, architecture, and security.
 user-invocable: true
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Skill
 ---
@@ -27,6 +27,7 @@ Invoke these forked reviewer skills in parallel. Each runs in its own isolated c
 - **`testability-review`**: Are acceptance criteria testable? What edge cases are missing?
 - **`scope-review`**: Is each strategy right-sized? Does the effort match the scope?
 - **`architecture-review`** (if architecture context available): Are dependencies correctly identified? Are integration patterns correct?
+- **`security-review`**: Are there security risks? What mitigations are missing? What security acceptance criteria should be added?
 
 Each reviewer receives:
 - The strategy artifacts (`artifacts/strat-tasks/`)
@@ -50,7 +51,8 @@ python3 scripts/frontmatter.py set artifacts/strat-reviews/<id>-review.md \
     reviewers.feasibility=<verdict> \
     reviewers.testability=<verdict> \
     reviewers.scope=<verdict> \
-    reviewers.architecture=<verdict>
+    reviewers.architecture=<verdict> \
+    reviewers.security=<verdict>
 ```
 
 The review file body should contain:
@@ -67,6 +69,9 @@ The review file body should contain:
 
 ## Architecture
 <assessment from architecture reviewer, or "skipped — no context">
+
+## Security
+<assessment from security reviewer, or "skipped — reviewer unavailable">
 
 ## Agreements
 <where reviewers aligned>

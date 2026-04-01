@@ -205,6 +205,11 @@ SCHEMAS = {
                     "required": True,
                     "enum": ["approve", "revise", "reject"],
                 },
+                "security": {
+                    "type": "string",
+                    "required": True,
+                    "enum": ["approve", "revise", "reject"],
+                },
             },
         },
     },

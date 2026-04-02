@@ -25,28 +25,13 @@ Check if `JIRA_SERVER`, `JIRA_USER`, and `JIRA_TOKEN` environment variables are 
 >
 > After environment variables are set, re-run `/rfe.submit`.
 
-## Step 1: Conflict Detection
-
-Run the conflict check script:
-
-```bash
-python3 scripts/check_conflicts.py --artifacts-dir artifacts
-```
-
-Parse the output and exit code:
-- **Exit code 0**: No conflicts. Proceed to Step 2.
-- **Exit code 1**: Conflicts detected. Report each `CONFLICT:` line to the user and stop. Tell them to re-fetch from Jira by running `/rfe.review <rfe_id>`, then re-apply changes.
-- **Exit code 2**: Missing credentials. Show the credential setup instructions from Step 0 and stop.
-
-Skip conflict detection for `--dry-run` — go directly to Step 2.
-
-## Step 2: Run Submission
+## Step 1: Run Submission
 
 ```bash
 python3 scripts/submit.py [--dry-run] [--artifacts-dir artifacts]
 ```
 
-## Step 3: Report Results
+## Step 2: Report Results
 
 After the script completes, read `artifacts/rfes.md` (rebuilt by the script) and report the results.
 

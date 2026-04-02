@@ -40,42 +40,11 @@ Parse the output and exit code:
 
 Skip conflict detection for `--dry-run` — go directly to Step 2.
 
-## Step 2: Detect Mode and Run
-
-Check task file frontmatter to determine whether this is a split submission or standard submission.
-
-### Split Submission
-
-If any task file has `status: Archived` and other task files have a matching `parent_key`, this is a split submission. Find the parent's `rfe_id` from its frontmatter and run:
-
-```bash
-python3 scripts/split_submit.py <PARENT_KEY> [--dry-run] [--artifacts-dir artifacts]
-```
-
-The split submit script handles:
-- Persisting child RFE content as comments on the parent (durable backup)
-- Creating child tickets with proper "Issue split" linking to the parent
-- Closing the parent ticket as Obsolete
-- Idempotent recovery if interrupted
-- Renaming local files from RFE-NNN to RHAIRFE-NNNN after submission
-- Rebuilding the rfes.md index
-
-### Standard Submission
-
-Otherwise, run:
+## Step 2: Run Submission
 
 ```bash
 python3 scripts/submit.py [--dry-run] [--artifacts-dir artifacts]
 ```
-
-The standard submit script handles:
-- Reading review recommendations from `rfe-reviews/` frontmatter and skipping rejected RFEs
-- Creating new RHAIRFE tickets for RFEs with local IDs (RFE-NNN)
-- Updating existing tickets for RFEs with Jira IDs (RHAIRFE-NNNN)
-- Applying labels from the labeling scheme (see below)
-- Posting removed-context Jira comments where applicable (from `*-removed-context.yaml` — posts `genuine` and `unclassified` blocks)
-- Renaming local files from RFE-NNN to RHAIRFE-NNNN after submission
-- Rebuilding the rfes.md index
 
 ## Step 3: Report Results
 

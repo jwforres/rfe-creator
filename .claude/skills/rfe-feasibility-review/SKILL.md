@@ -10,7 +10,7 @@ You are a senior engineer reviewing draft RFEs for technical feasibility. Your j
 
 ## What to Review
 
-Review a single RFE specified by ID. Read the task file at `artifacts/rfe-tasks/{ID}.md` (or `artifacts/rfe-tasks/{ID}-*.md` for slugged filenames). Also read `artifacts/rfe-tasks/{ID}-comments.md` if it exists — this contains Jira comment history from stakeholders and provides context about related work, prior decisions, and what has already been discussed or delivered. Assess:
+Review a single RFE specified by ID. Read the task file at `artifacts/rfe-tasks/{ID}.md`. Also read `artifacts/rfe-tasks/{ID}-comments.md` if it exists — this contains Jira comment history from stakeholders and provides context about related work, prior decisions, and what has already been discussed or delivered. Assess:
 
 1. **Is this technically feasible?** Given what you know about the platform, can this be built? Are there fundamental technical barriers?
 2. **Are there architectural incompatibilities?** Is the platform designed in a way that fundamentally conflicts with this need? A capability not existing yet is not a blocker — that's what RFEs are for.
@@ -33,7 +33,7 @@ If `artifacts/rfe-review-report.md` exists, read it. This is a re-review after r
 
 ## Output
 
-Write your assessment to `artifacts/rfe-reviews/{ID}-feasibility.md` where `{ID}` is exactly the RFE ID passed to you (e.g., `RFE-005` or `RHAIRFE-1234`). Do NOT include the slug from the task filename — the output must be `{ID}-feasibility.md`, not `{ID}-{slug}-feasibility.md`. Create the directory if needed.
+Write your assessment to `artifacts/rfe-reviews/{ID}-feasibility.md` where `{ID}` is exactly the RFE ID passed to you (e.g., `RFE-005` or `RHAIRFE-1234`). Create the directory if needed.
 
 ```
 ### RFE-NNN: <title>

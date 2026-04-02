@@ -107,7 +107,7 @@ python3 scripts/next_rfe_id.py <number_of_children>
 
 This prints one RFE-NNN ID per line. Use these IDs in order for your children. The script locks to prevent races — do NOT scan the directory yourself.
 
-5. Write each to `artifacts/rfe-tasks/RFE-NNN-<slug>.md` (rename the placeholder file created by the ID script)
+5. Write each to `artifacts/rfe-tasks/RFE-NNN.md`
 6. Set frontmatter on each child:
 
 ```bash

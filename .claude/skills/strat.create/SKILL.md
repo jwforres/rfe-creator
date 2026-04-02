@@ -81,7 +81,7 @@ After cloning, run `/strat.refine` to add the technical strategy.
 
 Regardless of whether Jira cloning succeeded, create stub files in `artifacts/strat-tasks/` for each strategy.
 
-Write the markdown body to `artifacts/strat-tasks/STRAT-NNN-<slug>.md`:
+Write the markdown body to `artifacts/strat-tasks/STRAT-NNN.md`:
 
 ```markdown
 ## Business Need (from RFE)

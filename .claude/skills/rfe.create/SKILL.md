@@ -70,7 +70,7 @@ Allocate IDs atomically (prevents collisions with parallel runs):
 python3 scripts/next_rfe_id.py <count>
 ```
 
-This prints one `RFE-NNN` per line. Use these IDs for filenames: `artifacts/rfe-tasks/RFE-NNN-<slug>.md`.
+This prints one `RFE-NNN` per line. Use these IDs for filenames: `artifacts/rfe-tasks/RFE-NNN.md`.
 
 Read the schema to know exact field names and allowed values:
 

@@ -13,6 +13,7 @@ Parse `$ARGUMENTS` for:
 - `--jql "<query>"`: JQL query to fetch IDs from Jira
 - `--limit N`: Cap the number of IDs to process (useful for testing JQL queries)
 - `--batch-size N`: Override batch size (default: 5)
+- `--data-dir "<path>"`: Local directory with previous run results (for snapshot diffing)
 - `--headless`: Suppress summaries (when called by speedrun)
 - `--announce-complete`: Print completion marker when done (for CI / eval harnesses)
 - Remaining arguments: explicit RFE IDs (RHAIRFE-NNNN)
@@ -23,25 +24,24 @@ Persist parsed flags (survives context compression):
 python3 scripts/state.py init tmp/autofix-config.yaml headless=<true/false> announce_complete=<true/false> batch_size=<N>
 ```
 
-**JQL mode**: If `--jql` is present, run the query:
+**JQL mode**: If `--jql` is present, run the snapshot fetch:
 
 ```bash
-python3 scripts/jql_query.py "<query>" [--limit N]
+python3 scripts/snapshot_fetch.py fetch "<query>" --ids-file tmp/autofix-all-ids.txt --changed-file tmp/autofix-changed-ids.txt [--limit N] [--data-dir "<path>"]
 ```
 
-The script prints the actual JQL it runs (with added filters) to stderr. Output this to the user: `[AUTOFIX] JQL: <jql>`. Parse stdout: first line is `TOTAL=N`, remaining lines are IDs. These become the processing list.
+The script prints the actual JQL to stderr. Output this to the user: `[AUTOFIX] JQL: <jql>`. The script writes all IDs to process to `tmp/autofix-all-ids.txt` and changed-only IDs to `tmp/autofix-changed-ids.txt`. Parse stdout for counts: `TOTAL=N`, `CHANGED=N`, `NEW=N`.
 
-**Explicit mode**: Use the provided IDs directly.
-
-If no IDs and no JQL query, stop with usage instructions.
-
-**Persist all IDs to disk** (survives context compression):
+**Explicit mode**: Use the provided IDs directly. Persist to disk:
 
 ```bash
 python3 scripts/state.py write-ids tmp/autofix-all-ids.txt <all_IDs>
+python3 scripts/state.py write-ids tmp/autofix-changed-ids.txt
 ```
 
-Output: `[AUTOFIX] Step 0: Parsed N IDs, batch_size=M`
+If no IDs and no JQL query, stop with usage instructions.
+
+Output: `[AUTOFIX] Step 0: Parsed N IDs (C changed, W new), batch_size=M`
 
 ## Step 1: Bootstrap Pre-flight
 
@@ -65,29 +65,15 @@ If the retry also fails, stop entirely: "assess-rfe bootstrap failed — cannot 
 
 Output: `[AUTOFIX] Step 2: Resume Check`
 
-Re-read the ID list from disk (in case context was compressed):
+Run the resume check. The script reads IDs and changed IDs from files, bypasses the resume check for changed IDs (their Jira content changed, so local reviews are stale), and writes the final process list:
 
 ```bash
-python3 scripts/state.py read-ids tmp/autofix-all-ids.txt
+python3 scripts/check_resume.py --ids-file tmp/autofix-all-ids.txt --changed-file tmp/autofix-changed-ids.txt --output-file tmp/autofix-process-ids.txt
 ```
 
-Output: `[AUTOFIX] Recovered N IDs from autofix-all-ids.txt`
+Parse stdout for counts: `PROCESS=N`, `SKIP=N`, `CHANGED=N`.
 
-Check which IDs are already processed:
-
-```bash
-python3 scripts/check_resume.py $(python3 scripts/state.py read-ids tmp/autofix-all-ids.txt)
-```
-
-Parse output for `PROCESS=` and `SKIP=` lines. Remove already-processed IDs (pass=true, no error) from the processing list.
-
-Output: `[AUTOFIX] Step 2: N to process, M skipped`
-
-Persist the filtered processing list to disk (survives context compression):
-
-```bash
-python3 scripts/state.py write-ids tmp/autofix-process-ids.txt <remaining_IDs>
-```
+Output: `[AUTOFIX] Step 2: N to process (C changed), M skipped`
 
 ## Step 3: Batch Processing
 
@@ -292,6 +278,7 @@ Present consolidated results (combine persisted IDs with any split children foun
 ### Reports
 - Run report: artifacts/auto-fix-runs/<run_id>.yaml
 - Review report: artifacts/auto-fix-runs/<run_id>-report.html
+- Snapshot: artifacts/auto-fix-runs/issue-snapshot-<ts>.yaml (written during fetch)
 
 ### Remaining Issues
 <Any issues that could not be auto-fixed, or "None">

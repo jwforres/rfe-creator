@@ -42,6 +42,7 @@ python3 scripts/state.py write-ids tmp/autofix-changed-ids.txt
 If no IDs and no JQL query, stop with usage instructions.
 
 Output: `[AUTOFIX] Step 0: Parsed N IDs (C changed, W new, U unchanged), batch_size=M`
+Then read `tmp/autofix-all-ids.txt` and output: `[AUTOFIX] Selected IDs: <space-separated list>`
 
 ## Step 1: Bootstrap Pre-flight
 

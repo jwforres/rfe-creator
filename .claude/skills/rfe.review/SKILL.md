@@ -7,7 +7,7 @@ allowed-tools: Glob, Bash, Agent, AskUserQuestion
 
 You are an RFE review orchestrator. Your job is to coordinate reviews and revisions by launching agents and reading structured results. **Critical: never read file contents into your context — only read frontmatter via `scripts/frontmatter.py read` and check file existence via Glob.** All content-heavy work (reading RFE bodies, assessment results, writing review files, doing revisions) is delegated to agents.
 
-## Step 0: Parse Arguments and Persist Flags
+## Review Step 0: Parse Arguments and Persist Flags
 
 Parse `$ARGUMENTS` for flags and IDs:
 - Strip `--headless` flag if present (suppresses end-of-run summary)
@@ -29,7 +29,7 @@ For each ID, check if `artifacts/rfe-tasks/<id>.md` already exists locally (use 
 - **Local**: task file exists — skip fetch
 - **Remote**: task file missing — needs Jira fetch
 
-## Step 1: Fetch Missing RFEs
+## Review Step 1: Fetch Missing RFEs
 
 For each remote ID, launch a **fetch agent** (model: opus, run_in_background: true):
 
@@ -54,7 +54,7 @@ python3 scripts/frontmatter.py set artifacts/rfe-reviews/<ID>-review.md rfe_id=<
 
 Remove failed IDs from the processing list and continue with remaining IDs.
 
-## Step 1.5: Setup
+## Review Step 1.5: Setup
 
 Run these in parallel (two Bash calls):
 
@@ -68,7 +68,7 @@ bash scripts/bootstrap-assess-rfe.sh
 
 If architecture fetch fails, proceed without it. If bootstrap fails, note it — review agents will do basic quality checks instead.
 
-## Step 2: Launch Assessment + Feasibility Agents
+## Review Step 2: Launch Assessment + Feasibility Agents
 
 For each ID being reviewed:
 
@@ -108,7 +108,7 @@ After completion, check prerequisites for each ID via Glob:
 - If feasibility file (`artifacts/rfe-reviews/<ID>-feasibility.md`) is missing → write error: `feasibility_failed`
 - If either is missing for an ID, write the error to review frontmatter and remove from processing list
 
-## Step 3: Launch Review Agents
+## Review Step 3: Launch Review Agents
 
 For each remaining ID, launch a **review agent** (model: opus, run_in_background: true):
 
@@ -127,7 +127,7 @@ python3 scripts/check_review_progress.py --phase review --id-file tmp/rfe-poll-r
 
 Sleep for the `NEXT_POLL` seconds reported by the script before polling again. Wait for all to complete. For any ID where the review file is missing or has no frontmatter, write error: `review_failed`.
 
-## Step 3.5: Launch Revise Agents
+## Review Step 3.5: Launch Revise Agents
 
 After all review agents complete, re-read the ID list from disk (context compression may have corrupted in-memory lists):
 
@@ -141,7 +141,7 @@ Determine which IDs need revision:
 python3 scripts/filter_for_revision.py <all_IDs_from_file>
 ```
 
-The script outputs the IDs that need revision (filters out passing, infeasible, and rejected IDs). If the output is empty, skip to Step 4.
+The script outputs the IDs that need revision (filters out passing, infeasible, and rejected IDs). If the output is empty, skip to Review Step 4.
 
 Launch a **revise agent** (model: opus, run_in_background: true) for each ID returned:
 
@@ -178,7 +178,7 @@ If the script reports files differ and frontmatter shows `auto_revised=false`, f
 python3 scripts/frontmatter.py set artifacts/rfe-reviews/<ID>-review.md auto_revised=true
 ```
 
-## Step 4: Re-assess if Revised (max 2 cycles)
+## Review Step 4: Re-assess if Revised (max 2 cycles)
 
 Re-read ID list from disk:
 
@@ -226,7 +226,7 @@ rm artifacts/rfe-reviews/<ID>-review.md  # for each reassess ID
 rm /tmp/rfe-assess/single/<ID>.result.md  # for each reassess ID
 ```
 
-**4b. Re-run assessment.** For each reassess ID, prepare and launch an assess agent — this is the same process as Step 2:
+**4b. Re-run assessment.** For each reassess ID, prepare and launch an assess agent — this is the same process as Review Step 2:
 
 ```bash
 python3 scripts/prep_assess.py <ID>
@@ -288,11 +288,11 @@ python3 scripts/preserve_review_state.py restore <all_reassess_IDs_from_file>
 python3 scripts/filter_for_revision.py <all_reassess_IDs_from_file>
 ```
 
-Launch revise agents for the IDs returned (if any). Wait for all to complete, run post-processing auto_revised flag fix (same as Step 3.5).
+Launch revise agents for the IDs returned (if any). Wait for all to complete, run post-processing auto_revised flag fix (same as Review Step 3.5).
 
 After cycle 2, stop regardless of results.
 
-## Step 5: Finalize
+## Review Step 5: Finalize
 
 Rebuild the index once:
 
@@ -306,7 +306,7 @@ Re-read flags (in case context was compressed):
 python3 scripts/state.py read tmp/review-config.yaml
 ```
 
-**If `headless: true`**: Stop here. Do not output any summary. The calling orchestrator handles reporting. **Resume the calling skill's next step immediately.**
+**If `headless: true`**: The review phase is complete, but the overall pipeline is NOT finished. Do not output a summary — the calling orchestrator handles all reporting. **Yield execution to the calling skill's next step immediately.**
 
 **If interactive (no `--headless`)**: Re-read ID list and present summary:
 

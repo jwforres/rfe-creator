@@ -7,7 +7,7 @@ allowed-tools: Glob, Bash, Agent, Skill, AskUserQuestion
 
 You are an RFE splitting orchestrator. Your job is to coordinate RFE decomposition by launching agents and reading structured results. **Critical: never read file contents into your context — only read frontmatter via `scripts/frontmatter.py read` and check file existence via Glob.** All content-heavy work (reading RFE bodies, decomposition analysis, generating children) is delegated to agents.
 
-## Step 0: Parse Arguments and Persist Flags
+## Split Step 0: Parse Arguments and Persist Flags
 
 Parse `$ARGUMENTS` for flags and IDs:
 - Strip `--headless` flag if present (suppresses end-of-run summary)
@@ -29,7 +29,7 @@ python3 scripts/state.py write-ids tmp/split-all-ids.txt <all_IDs>
 
 For each ID, verify the task file exists via Glob (`artifacts/rfe-tasks/<ID>.md`). If missing, report and skip.
 
-## Step 1: Launch Split Agents
+## Split Step 1: Launch Split Agents
 
 For each ID, launch a **split agent** (model: opus, run_in_background: true):
 
@@ -54,7 +54,7 @@ After all agents complete, check split-status files for each ID. If the file is 
 python3 scripts/frontmatter.py set artifacts/rfe-reviews/<ID>-review.md error="split_failed: agent did not write split-status file"
 ```
 
-## Step 2: Collect Children and Review
+## Split Step 2: Collect Children and Review
 
 Re-read parent IDs from disk (context compression may have corrupted in-memory lists):
 
@@ -84,7 +84,7 @@ If there are children to review, invoke `/rfe.review` as an inline Skill, passin
 
 This triggers the full agent delegation review pipeline on all children.
 
-## Step 3: Right-sizing Self-Correction (up to 1 cycle)
+## Split Step 3: Right-sizing Self-Correction (up to 1 cycle)
 
 Limited to 1 cycle because repeated re-splitting compounds child count (e.g. 5 → 9) and produces diminishing returns — if decomposition is still wrong after one correction, it needs human judgment.
 
@@ -114,7 +114,7 @@ python3 scripts/frontmatter.py read artifacts/rfe-reviews/<child_ID>-review.md
 
 If any child scores below 2/2 on `scores.right_sized`:
 
-1. **Re-split**: Launch a split agent for the offending child (same prompt as Step 1)
+1. **Re-split**: Launch a split agent for the offending child (same prompt as Split Step 1)
 2. **Wait** for the agent to complete
 3. **Collect new children**: `python3 scripts/collect_children.py <re-split_ID>`
 4. **Review new children**: Invoke `/rfe.review [--headless] <new_child_IDs>`
@@ -130,7 +130,7 @@ Re-read config before starting the next cycle to check the counter. Stop after 1
 
 **Do not re-split for non-Right-sized criteria.** This loop only corrects grouping mistakes caught by the Right-sized score. Other criteria are handled by `/rfe.review`'s auto-revision.
 
-## Step 4: Finalize
+## Split Step 4: Finalize
 
 Rebuild the index once:
 
@@ -144,7 +144,7 @@ Re-read flags (in case context was compressed):
 python3 scripts/state.py read tmp/split-config.yaml
 ```
 
-**If `headless: true`**: Stop here. Do not output any summary. **Resume the calling skill's next step immediately.**
+**If `headless: true`**: The split phase is complete, but the overall pipeline is NOT finished. Do not output a summary — the calling orchestrator handles all reporting. **Yield execution to the calling skill's next step immediately.**
 
 **If interactive (no `--headless`)**: Present the final state for each parent ID:
 

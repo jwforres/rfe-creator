@@ -57,7 +57,7 @@ For each entry, invoke `/rfe.create` as an inline Skill:
 /rfe.create --headless [--priority <priority>] [--labels <labels>] <prompt>
 ```
 
-Collect all created RFE IDs from the output.
+Collect all created RFE IDs from the output. **Never delete, rename, or re-create RFE task files during Phase 1** — quality issues are addressed in Phase 2 (Auto-fix). Each batch entry must produce exactly one RFE with a stable ID.
 
 **Mode B (Existing RFE)**: Skip Phase 1. The Jira key(s) from arguments become the processing list.
 

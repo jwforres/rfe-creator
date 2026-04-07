@@ -99,7 +99,7 @@ MAIN PIPELINE (per batch):
 
 COLLECT:
   → decision: splits?
-       yes → SPLIT → SPLIT_COLLECT → SPLIT_ASSESS → SPLIT_REVIEW → SPLIT_REVISE → SPLIT_FIXUP
+       yes → SPLIT → SPLIT_COLLECT → SPLIT_PIPELINE_START → [SPLIT_ASSESS, SPLIT_REVIEW, SPLIT_REVISE, SPLIT_FIXUP]
        no → BATCH_DONE
 
 SPLIT_CORRECTION_CHECK:
@@ -111,7 +111,19 @@ All agent phases use max_concurrent waves (see below) to cap concurrency.
 BATCH_DONE:
   → decision: more batches?
        yes → BATCH_START
-       no → RETRY_SETUP → [main pipeline on error IDs] → REPORT → DONE
+       no → RETRY_SETUP
+
+RETRY PIPELINE (error IDs, full pipeline including splits):
+  [RETRY_FETCH, RETRY_ASSESS, RETRY_REVIEW, RETRY_REVISE, RETRY_FIXUP, RETRY_COLLECT]
+  → decision: splits?
+       yes → RETRY_SPLIT → RETRY_SPLIT_COLLECT → [RETRY_SPLIT_ASSESS, RETRY_SPLIT_REVIEW, RETRY_SPLIT_REVISE, RETRY_SPLIT_FIXUP]
+       no → REPORT
+
+RETRY_SPLIT_CORRECTION_CHECK:
+  → undersized & cycle < 1 → cycle back to RETRY_SPLIT (only undersized IDs)
+  → otherwise → REPORT
+
+REPORT → DONE
 ```
 
 ### Max Concurrent & Wave Dispatch
@@ -187,16 +199,62 @@ Combines three responsibilities:
 ### Phase enum
 
 ```
-INIT, BOOTSTRAP, RESUME_CHECK,
-BATCH_START, FETCH, SETUP, ASSESS, REVIEW, REVISE, FIXUP,
-REASSESS_CHECK, REASSESS_SAVE, REASSESS_ASSESS, REASSESS_REVIEW,
-  REASSESS_RESTORE, REASSESS_REVISE, REASSESS_FIXUP,
-COLLECT, SPLIT, SPLIT_COLLECT,
-  SPLIT_PIPELINE_START, SPLIT_ASSESS, SPLIT_REVIEW, SPLIT_REVISE, SPLIT_FIXUP,
-  SPLIT_CORRECTION_CHECK,
-BATCH_DONE,
-RETRY_SETUP, RETRY_FETCH, RETRY_ASSESS, RETRY_REVIEW, RETRY_REVISE, RETRY_FIXUP, RETRY_COLLECT,
-REPORT, DONE
+# Initialization
+INIT                         # Parse CLI arguments and initialize the pipeline state file
+BOOTSTRAP                    # One-time setup: snapshot fetch or JQL query to get the full ID list
+RESUME_CHECK                 # Filter out already-processed IDs and split the remainder into batches
+
+# Main pipeline (per batch)
+BATCH_START                  # Begin a new batch by setting the active ID list from the next batch file
+FETCH                        # Fetch missing RFE task files from Jira for active IDs
+SETUP                        # Per-batch setup: bootstrap assess-rfe plugin and fetch architecture context
+ASSESS                       # Score each RFE against the quality rubric and check technical feasibility
+REVIEW                       # Synthesize assessment + feasibility into a scored review with recommendation
+REVISE                       # Auto-revise RFEs that failed review but are revisable
+FIXUP                        # Verify and correct the auto_revised frontmatter flag after revision
+
+# Reassess loop (max 2 cycles)
+REASSESS_CHECK               # Determine which revised RFEs need re-scoring (auto_revised=true, pass=false)
+REASSESS_SAVE                # Preserve cumulative review state and remove review files for progress detection
+REASSESS_ASSESS              # Re-run assessment on revised RFEs
+REASSESS_REVIEW              # Re-run review on revised RFEs
+REASSESS_RESTORE             # Restore before_scores and revision history from saved state
+REASSESS_REVISE              # Auto-revise RFEs that still fail after re-assessment
+REASSESS_FIXUP               # Verify auto_revised flag after reassessment revision
+
+# Collect and split
+COLLECT                      # Gather recommendations: which RFEs to submit, split, or have errors
+SPLIT                        # Decompose oversized RFEs into smaller children
+SPLIT_COLLECT                # Collect child IDs produced by split agents
+SPLIT_PIPELINE_START         # Initialize the split sub-pipeline state (child ID files, counters)
+SPLIT_ASSESS                 # Score split children against rubric and check feasibility
+SPLIT_REVIEW                 # Synthesize review for split children
+SPLIT_REVISE                 # Auto-revise split children that failed review
+SPLIT_FIXUP                  # Verify auto_revised flag for split children
+SPLIT_CORRECTION_CHECK       # Check right_sized scores; re-split undersized children if cycle < 1
+
+# Batch control
+BATCH_DONE                   # Current batch complete; decide whether to start next batch or move to retry
+
+# Retry pipeline (error IDs get full pipeline including splits)
+RETRY_SETUP                  # Bootstrap setup for the error retry pass
+RETRY_FETCH                  # Re-fetch RFEs that had fetch errors
+RETRY_ASSESS                 # Re-assess RFEs that had assessment errors
+RETRY_REVIEW                 # Re-review RFEs that had review errors
+RETRY_REVISE                 # Re-revise RFEs that had revision errors
+RETRY_FIXUP                  # Fixup for retried RFEs
+RETRY_COLLECT                # Collect results from the retry pass
+RETRY_SPLIT                  # Decompose oversized retry RFEs into children
+RETRY_SPLIT_COLLECT          # Collect child IDs from retry split agents
+RETRY_SPLIT_ASSESS           # Score retry split children against rubric and check feasibility
+RETRY_SPLIT_REVIEW           # Synthesize review for retry split children
+RETRY_SPLIT_REVISE           # Auto-revise retry split children that failed review
+RETRY_SPLIT_FIXUP            # Verify auto_revised flag for retry split children
+RETRY_SPLIT_CORRECTION_CHECK # Check right_sized scores for retry split children; re-split if cycle < 1
+
+# Finalization
+REPORT                       # Generate the run report
+DONE                         # Pipeline complete
 ```
 
 ### Phase config map (Python dict in `pipeline_state.py`)
@@ -235,12 +293,24 @@ PHASE_CONFIG = {
 
 ```python
 def advance(current_phase, state):
-    # Linear transitions within main pipeline
+    # Linear sequences
     MAIN_SEQUENCE = ["FETCH", "SETUP", "ASSESS", "REVIEW", "REVISE", "FIXUP"]
-    if current_phase in MAIN_SEQUENCE[:-1]:
-        return MAIN_SEQUENCE[MAIN_SEQUENCE.index(current_phase) + 1]
+    REASSESS_SEQUENCE = ["REASSESS_SAVE", "REASSESS_ASSESS", "REASSESS_REVIEW",
+                         "REASSESS_RESTORE", "REASSESS_REVISE", "REASSESS_FIXUP"]
+    SPLIT_SEQUENCE = ["SPLIT_COLLECT", "SPLIT_PIPELINE_START", "SPLIT_ASSESS",
+                      "SPLIT_REVIEW", "SPLIT_REVISE", "SPLIT_FIXUP", "SPLIT_CORRECTION_CHECK"]
+    RETRY_SEQUENCE = ["RETRY_FETCH", "RETRY_ASSESS", "RETRY_REVIEW",
+                      "RETRY_REVISE", "RETRY_FIXUP", "RETRY_COLLECT"]
+    RETRY_SPLIT_SEQUENCE = ["RETRY_SPLIT_COLLECT", "RETRY_SPLIT_ASSESS",
+                            "RETRY_SPLIT_REVIEW", "RETRY_SPLIT_REVISE",
+                            "RETRY_SPLIT_FIXUP", "RETRY_SPLIT_CORRECTION_CHECK"]
 
-    # Decision points
+    for seq in [MAIN_SEQUENCE, REASSESS_SEQUENCE, SPLIT_SEQUENCE,
+                RETRY_SEQUENCE, RETRY_SPLIT_SEQUENCE]:
+        if current_phase in seq[:-1]:
+            return seq[seq.index(current_phase) + 1]
+
+    # Decision points — main pipeline
     if current_phase == "FIXUP":
         reassess_ids = run("collect_recommendations.py --reassess")
         cycle = state["reassess_cycle"]
@@ -248,11 +318,17 @@ def advance(current_phase, state):
             return "REASSESS_CHECK"
         return "COLLECT"
 
+    if current_phase == "REASSESS_FIXUP":
+        return "REASSESS_CHECK"  # loops back; REASSESS_CHECK re-evaluates cycle
+
     if current_phase == "COLLECT":
         split_ids = run("collect_recommendations.py")  # parse SPLIT=
         if split_ids:
             return "SPLIT"
         return "BATCH_DONE"
+
+    if current_phase == "SPLIT":
+        return "SPLIT_COLLECT"
 
     if current_phase == "SPLIT_CORRECTION_CHECK":
         undersized = run("check_right_sized.py <child_ids>")
@@ -260,11 +336,37 @@ def advance(current_phase, state):
             return "SPLIT"
         return "BATCH_DONE"
 
+    # Decision points — batch control
     if current_phase == "BATCH_DONE":
         if state["batch"] < state["total_batches"]:
             return "BATCH_START"
-        return "RETRY_SETUP"
-    # ... etc
+        error_ids = run("collect_recommendations.py --errors <all_ids>")
+        if error_ids:
+            return "RETRY_SETUP"
+        return "REPORT"
+
+    # Decision points — retry pipeline
+    if current_phase == "RETRY_SETUP":
+        return "RETRY_FETCH"
+
+    if current_phase == "RETRY_COLLECT":
+        split_ids = run("collect_recommendations.py --splits <retry_ids>")
+        if split_ids:
+            return "RETRY_SPLIT"
+        return "REPORT"
+
+    if current_phase == "RETRY_SPLIT":
+        return "RETRY_SPLIT_COLLECT"
+
+    if current_phase == "RETRY_SPLIT_CORRECTION_CHECK":
+        undersized = run("check_right_sized.py <retry_child_ids>")
+        if undersized and state["retry_correction_cycle"] < 1:
+            return "RETRY_SPLIT"
+        return "REPORT"
+
+    # Terminal
+    if current_phase == "REPORT":
+        return "DONE"
 ```
 
 ### CLI

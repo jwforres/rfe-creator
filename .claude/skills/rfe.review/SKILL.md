@@ -93,7 +93,7 @@ Read the skill file at .claude/skills/rfe-feasibility-review/SKILL.md and follow
 
 Launch all agents for all IDs in parallel (2N agents total for N IDs).
 
-Write IDs to poll files once, then poll every 60 seconds:
+Write IDs to poll files once, then poll using `NEXT_POLL` interval:
 
 ```bash
 python3 scripts/state.py write-ids tmp/rfe-poll-assess.txt <all_IDs>

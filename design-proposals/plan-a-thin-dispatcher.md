@@ -111,12 +111,16 @@ All agent phases use max_concurrent waves (see below) to cap concurrency.
 BATCH_DONE:
   → decision: more batches?
        yes → BATCH_START
-       no → RETRY_SETUP
+       errors exist → RETRY_SETUP
+       no errors → REPORT
 
-RETRY PIPELINE (error IDs, full pipeline including splits):
-  [RETRY_FETCH, RETRY_ASSESS, RETRY_REVIEW, RETRY_REVISE, RETRY_FIXUP, RETRY_COLLECT]
+RETRY PIPELINE (error IDs, full pipeline including reassess + splits):
+  [RETRY_FETCH, RETRY_ASSESS, RETRY_REVIEW, RETRY_REVISE, RETRY_FIXUP]
+  → decision: reassess?
+       yes (cycle < 2, reassess IDs exist) → RETRY_REASSESS_SAVE → [RETRY_REASSESS_ASSESS, RETRY_REASSESS_REVIEW, RETRY_REASSESS_RESTORE, RETRY_REASSESS_REVISE, RETRY_REASSESS_FIXUP] → loop decision
+       no → RETRY_COLLECT
   → decision: splits?
-       yes → RETRY_SPLIT → RETRY_SPLIT_COLLECT → [RETRY_SPLIT_ASSESS, RETRY_SPLIT_REVIEW, RETRY_SPLIT_REVISE, RETRY_SPLIT_FIXUP]
+       yes → RETRY_SPLIT → RETRY_SPLIT_COLLECT → RETRY_SPLIT_PIPELINE_START → [RETRY_SPLIT_ASSESS, RETRY_SPLIT_REVIEW, RETRY_SPLIT_REVISE, RETRY_SPLIT_FIXUP]
        no → REPORT
 
 RETRY_SPLIT_CORRECTION_CHECK:
@@ -236,21 +240,29 @@ SPLIT_CORRECTION_CHECK       # Check right_sized scores; re-split undersized chi
 # Batch control
 BATCH_DONE                   # Current batch complete; decide whether to start next batch or move to retry
 
-# Retry pipeline (error IDs get full pipeline including splits)
-RETRY_SETUP                  # Bootstrap setup for the error retry pass
-RETRY_FETCH                  # Re-fetch RFEs that had fetch errors
-RETRY_ASSESS                 # Re-assess RFEs that had assessment errors
-RETRY_REVIEW                 # Re-review RFEs that had review errors
-RETRY_REVISE                 # Re-revise RFEs that had revision errors
-RETRY_FIXUP                  # Fixup for retried RFEs
-RETRY_COLLECT                # Collect results from the retry pass
-RETRY_SPLIT                  # Decompose oversized retry RFEs into children
-RETRY_SPLIT_COLLECT          # Collect child IDs from retry split agents
-RETRY_SPLIT_ASSESS           # Score retry split children against rubric and check feasibility
-RETRY_SPLIT_REVIEW           # Synthesize review for retry split children
-RETRY_SPLIT_REVISE           # Auto-revise retry split children that failed review
-RETRY_SPLIT_FIXUP            # Verify auto_revised flag for retry split children
-RETRY_SPLIT_CORRECTION_CHECK # Check right_sized scores for retry split children; re-split if cycle < 1
+# Retry pipeline (error IDs get full pipeline including reassess + splits)
+RETRY_SETUP                       # Bootstrap setup for the error retry pass
+RETRY_FETCH                       # Re-fetch RFEs that had fetch errors
+RETRY_ASSESS                      # Re-assess RFEs that had assessment errors
+RETRY_REVIEW                      # Re-review RFEs that had review errors
+RETRY_REVISE                      # Re-revise RFEs that had revision errors
+RETRY_FIXUP                       # Fixup for retried RFEs
+RETRY_REASSESS_CHECK              # Determine which retried RFEs need re-scoring
+RETRY_REASSESS_SAVE               # Preserve retry review state and remove files for progress detection
+RETRY_REASSESS_ASSESS             # Re-run assessment on retried revised RFEs
+RETRY_REASSESS_REVIEW             # Re-run review on retried revised RFEs
+RETRY_REASSESS_RESTORE            # Restore before_scores and revision history for retried RFEs
+RETRY_REASSESS_REVISE             # Auto-revise retried RFEs that still fail after re-assessment
+RETRY_REASSESS_FIXUP              # Verify auto_revised flag after retry reassessment revision
+RETRY_COLLECT                     # Collect results from the retry pass
+RETRY_SPLIT                       # Decompose oversized retry RFEs into children
+RETRY_SPLIT_COLLECT               # Collect child IDs from retry split agents
+RETRY_SPLIT_PIPELINE_START        # Initialize retry split sub-pipeline state (child ID files, counters)
+RETRY_SPLIT_ASSESS                # Score retry split children against rubric and check feasibility
+RETRY_SPLIT_REVIEW                # Synthesize review for retry split children
+RETRY_SPLIT_REVISE                # Auto-revise retry split children that failed review
+RETRY_SPLIT_FIXUP                 # Verify auto_revised flag for retry split children
+RETRY_SPLIT_CORRECTION_CHECK      # Check right_sized scores for retry split children; re-split if cycle < 1
 
 # Finalization
 REPORT                       # Generate the run report
@@ -300,26 +312,35 @@ def advance(current_phase, state):
     SPLIT_SEQUENCE = ["SPLIT_COLLECT", "SPLIT_PIPELINE_START", "SPLIT_ASSESS",
                       "SPLIT_REVIEW", "SPLIT_REVISE", "SPLIT_FIXUP", "SPLIT_CORRECTION_CHECK"]
     RETRY_SEQUENCE = ["RETRY_FETCH", "RETRY_ASSESS", "RETRY_REVIEW",
-                      "RETRY_REVISE", "RETRY_FIXUP", "RETRY_COLLECT"]
-    RETRY_SPLIT_SEQUENCE = ["RETRY_SPLIT_COLLECT", "RETRY_SPLIT_ASSESS",
-                            "RETRY_SPLIT_REVIEW", "RETRY_SPLIT_REVISE",
-                            "RETRY_SPLIT_FIXUP", "RETRY_SPLIT_CORRECTION_CHECK"]
+                      "RETRY_REVISE", "RETRY_FIXUP"]
+    RETRY_REASSESS_SEQUENCE = ["RETRY_REASSESS_SAVE", "RETRY_REASSESS_ASSESS",
+                               "RETRY_REASSESS_REVIEW", "RETRY_REASSESS_RESTORE",
+                               "RETRY_REASSESS_REVISE", "RETRY_REASSESS_FIXUP"]
+    RETRY_SPLIT_SEQUENCE = ["RETRY_SPLIT_COLLECT", "RETRY_SPLIT_PIPELINE_START",
+                            "RETRY_SPLIT_ASSESS", "RETRY_SPLIT_REVIEW",
+                            "RETRY_SPLIT_REVISE", "RETRY_SPLIT_FIXUP",
+                            "RETRY_SPLIT_CORRECTION_CHECK"]
 
     for seq in [MAIN_SEQUENCE, REASSESS_SEQUENCE, SPLIT_SEQUENCE,
-                RETRY_SEQUENCE, RETRY_SPLIT_SEQUENCE]:
+                RETRY_SEQUENCE, RETRY_REASSESS_SEQUENCE,
+                RETRY_SPLIT_SEQUENCE]:
         if current_phase in seq[:-1]:
             return seq[seq.index(current_phase) + 1]
 
     # Decision points — main pipeline
     if current_phase == "FIXUP":
+        return "REASSESS_CHECK"
+
+    if current_phase == "REASSESS_CHECK":
         reassess_ids = run("collect_recommendations.py --reassess")
         cycle = state["reassess_cycle"]
         if reassess_ids and cycle < 2:
-            return "REASSESS_CHECK"
+            state["reassess_cycle"] = cycle + 1
+            return "REASSESS_SAVE"
         return "COLLECT"
 
     if current_phase == "REASSESS_FIXUP":
-        return "REASSESS_CHECK"  # loops back; REASSESS_CHECK re-evaluates cycle
+        return "REASSESS_CHECK"  # loops back; CHECK re-evaluates cycle
 
     if current_phase == "COLLECT":
         split_ids = run("collect_recommendations.py")  # parse SPLIT=
@@ -345,9 +366,23 @@ def advance(current_phase, state):
             return "RETRY_SETUP"
         return "REPORT"
 
-    # Decision points — retry pipeline
+    # Decision points — retry pipeline (mirrors main pipeline)
     if current_phase == "RETRY_SETUP":
         return "RETRY_FETCH"
+
+    if current_phase == "RETRY_FIXUP":
+        return "RETRY_REASSESS_CHECK"
+
+    if current_phase == "RETRY_REASSESS_FIXUP":
+        return "RETRY_REASSESS_CHECK"  # loops back; CHECK re-evaluates cycle
+
+    if current_phase == "RETRY_REASSESS_CHECK":
+        reassess_ids = run("collect_recommendations.py --reassess <retry_ids>")
+        cycle = state["retry_reassess_cycle"]
+        if reassess_ids and cycle < 2:
+            state["retry_reassess_cycle"] = cycle + 1
+            return "RETRY_REASSESS_SAVE"
+        return "RETRY_COLLECT"
 
     if current_phase == "RETRY_COLLECT":
         split_ids = run("collect_recommendations.py --splits <retry_ids>")

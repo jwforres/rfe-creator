@@ -1,6 +1,21 @@
-# Plan A — State Transition Diagram
-
-```mermaid
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Plan A — State Transition Diagram</title>
+<style>
+  body { background: #fff; margin: 40px; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+  h1 { font-size: 1.4em; margin-bottom: 20px; }
+  .mermaid { max-width: 100%; }
+</style>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'default', stateDiagram: { useMaxWidth: true } });
+</script>
+</head>
+<body>
+<h1>Plan A — State Transition Diagram</h1>
+<pre class="mermaid">
 stateDiagram-v2
     direction TB
 
@@ -20,7 +35,7 @@ stateDiagram-v2
 
         state reassess_decision <<choice>>
         REASSESS_CHECK --> reassess_decision
-        reassess_decision --> REASSESS_SAVE : IDs need re-scoring\n& cycle < 2
+        reassess_decision --> REASSESS_SAVE : IDs need re-scoring & cycle < 2
         reassess_decision --> COLLECT : none or cycle >= 2
 
         state "Reassess Loop" as reassess {
@@ -48,8 +63,8 @@ stateDiagram-v2
 
             state correction_decision <<choice>>
             SPLIT_CORRECTION_CHECK --> correction_decision
-            correction_decision --> SPLIT : undersized\n& cycle < 1
-            correction_decision --> BATCH_DONE : all pass or\ncycle >= 1
+            correction_decision --> SPLIT : undersized & cycle < 1
+            correction_decision --> BATCH_DONE : all pass or cycle >= 1
         }
     }
 
@@ -72,7 +87,7 @@ stateDiagram-v2
 
         state retry_reassess_decision <<choice>>
         RETRY_REASSESS_CHECK --> retry_reassess_decision
-        retry_reassess_decision --> RETRY_REASSESS_SAVE : IDs need re-scoring\n& cycle < 2
+        retry_reassess_decision --> RETRY_REASSESS_SAVE : IDs need re-scoring & cycle < 2
         retry_reassess_decision --> RETRY_COLLECT : none or cycle >= 2
 
         state "Retry Reassess Loop" as retry_reassess {
@@ -100,11 +115,13 @@ stateDiagram-v2
 
             state retry_correction_decision <<choice>>
             RETRY_SPLIT_CORRECTION_CHECK --> retry_correction_decision
-            retry_correction_decision --> RETRY_SPLIT : undersized\n& cycle < 1
-            retry_correction_decision --> REPORT : all pass or\ncycle >= 1
+            retry_correction_decision --> RETRY_SPLIT : undersized & cycle < 1
+            retry_correction_decision --> REPORT : all pass or cycle >= 1
         }
     }
 
     REPORT --> DONE
     DONE --> [*]
-```
+</pre>
+</body>
+</html>

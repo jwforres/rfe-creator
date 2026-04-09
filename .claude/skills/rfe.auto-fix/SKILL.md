@@ -91,7 +91,7 @@ Parse YAML for: `type`, `command`, `prompt`, `ids_file`, `vars`, `poll_phase`, `
 
 1. Read IDs from `ids_file`.
 2. Pre-filter already done: `python3 scripts/check_review_progress.py --phase <poll_phase> <IDs>` — remove COMPLETED IDs from the working set.
-3. Process remaining IDs in waves of 10:
+3. Compute wave size: `max_concurrent` (default `batch_size`) divided by `(1 + number of parallel entries)`, rounded down (minimum 1). Process remaining IDs in waves of that size:
 
    a. For each ID in the wave:
       - If `pre_script`: run it with `{ID}` substituted.
@@ -103,7 +103,7 @@ Parse YAML for: `type`, `command`, `prompt`, `ids_file`, `vars`, `poll_phase`, `
    b. Poll until wave completes:
 
       ```bash
-      python3 scripts/check_review_progress.py --phase <poll_phase> [--fast-poll] <wave_IDs>
+      python3 scripts/check_review_progress.py --phase <poll_phase> [--fast-poll if not headless] <wave_IDs>
       ```
 
       Parse `NEXT_POLL=` for sleep seconds. Stop when `PENDING=0`.

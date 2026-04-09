@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 scripts/pipeline_state.py dispatch-context"
+            "command": "python3 scripts/pipeline_state.py post-compact-hook"
           }
         ]
       }

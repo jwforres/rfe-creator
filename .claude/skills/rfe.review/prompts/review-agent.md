@@ -47,7 +47,7 @@ Set `needs_attention=true` when the RFE needs human review despite its score —
 ```bash
 python3 scripts/frontmatter.py set artifacts/rfe-reviews/{ID}-review.md \
     rfe_id={ID} score=<total> pass=<true/false> recommendation=<rec> \
-    feasibility=<feasible/infeasible/indeterminate> auto_revised=<true/false> needs_attention=<true/false> \
+    feasibility=<feasible/infeasible/indeterminate> needs_attention=<true/false> \
     needs_attention_reason="<reason or null>" \
     scores.what=<n> scores.why=<n> scores.open_to_how=<n> scores.not_a_task=<n> scores.right_sized=<n>
 ```

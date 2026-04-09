@@ -1,4 +1,17 @@
 {
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 scripts/pipeline_state.py post-compact-hook"
+          }
+        ]
+      }
+    ]
+  },
   "permissions": {
     "allow": [
       "Bash(python3 scripts/check_content_preservation.py *)",
@@ -27,6 +40,12 @@
       "Bash(python3 scripts/generate_review_pdf.py *)",
       "Bash(python3 scripts/check_conflicts.py *)",
       "Bash(python3 scripts/next_rfe_id.py *)",
+      "Bash(python3 scripts/pipeline_state.py *)",
+      "Bash(python3 scripts/error_collect.py *)",
+      "Bash(python3 scripts/verify_phase.py *)",
+      "Bash(python3 scripts/reassess_save.py *)",
+      "Bash(python3 scripts/split_collect.py *)",
+      "Bash(python3 scripts/check_right_sized.py *)",
       "Bash(python3 scripts/state.py *)",
       "Bash(python3 scripts/submit.py *)",
       "Bash(python3 scripts/split_submit.py *)",

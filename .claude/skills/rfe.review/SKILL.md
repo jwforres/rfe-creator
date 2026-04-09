@@ -161,28 +161,10 @@ python3 scripts/check_review_progress.py --phase revise --id-file tmp/rfe-poll-r
 
 Sleep for the `NEXT_POLL` seconds reported by the script before polling again. Wait for all to complete.
 
-**Post-processing: fix auto_revised flag.** The revise agent may run out of budget before setting `auto_revised=true`. After all agents complete, re-read the revised ID list from the poll file (compression may have lost them during agent execution):
+**Post-processing: fix auto_revised flag.** The revise agent may run out of budget before setting `auto_revised=true`. After all agents complete, run the batch check which compares originals to task files and sets the flag directly in review frontmatter:
 
 ```bash
-python3 scripts/state.py read-ids tmp/rfe-poll-revise.txt
-```
-
-For each revised ID, verify the flag is correct:
-
-```bash
-python3 scripts/check_revised.py artifacts/rfe-originals/<ID>.md artifacts/rfe-tasks/<ID>.md
-```
-
-If the script reports files differ and frontmatter shows `auto_revised=false`, fix it:
-
-```bash
-python3 scripts/frontmatter.py set artifacts/rfe-reviews/<ID>-review.md auto_revised=true
-```
-
-If the script reports files are identical and frontmatter shows `auto_revised=true`, fix it:
-
-```bash
-python3 scripts/frontmatter.py set artifacts/rfe-reviews/<ID>-review.md auto_revised=false
+python3 scripts/check_revised.py --batch $(python3 scripts/state.py read-ids tmp/rfe-poll-revise.txt)
 ```
 
 ## Review Step 4: Re-assess if Revised (max 2 cycles)
@@ -295,7 +277,11 @@ python3 scripts/preserve_review_state.py restore <all_reassess_IDs_from_file>
 python3 scripts/filter_for_revision.py <all_reassess_IDs_from_file>
 ```
 
-Launch revise agents for the IDs returned (if any). Wait for all to complete, run post-processing auto_revised flag fix (same as Review Step 3.5).
+Launch revise agents for the IDs returned (if any). Wait for all to complete, then run the batch auto_revised flag fix:
+
+```bash
+python3 scripts/check_revised.py --batch $(python3 scripts/state.py read-ids tmp/review-reassess-ids.txt)
+```
 
 After cycle 2, stop regardless of results.
 

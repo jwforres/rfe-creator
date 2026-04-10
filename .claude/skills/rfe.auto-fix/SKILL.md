@@ -22,15 +22,19 @@ python3 scripts/pipeline_state.py init [--batch-size N] [--headless] [--announce
 
 ### 2. IDs
 
-**Reprocess mode** (`--reprocess`): Skip this step entirely. Verify `tmp/pipeline-all-ids.txt` exists from a prior run; if missing, stop with: "No prior IDs found. Run with --jql or explicit IDs first."
-
 **JQL mode** (`--jql`):
 
 ```bash
-python3 scripts/snapshot_fetch.py fetch "<query>" --ids-file tmp/pipeline-all-ids.txt --changed-file tmp/pipeline-changed-ids.txt [--limit N] [--data-dir "<path>"]
+python3 scripts/snapshot_fetch.py fetch "<query>" --ids-file tmp/pipeline-all-ids.txt --changed-file tmp/pipeline-changed-ids.txt [--limit N] [--data-dir "<path>"] [--reprocess]
 ```
 
 Print `[AUTOFIX] JQL: <jql>` from stderr output.
+
+**Reprocess mode** (`--reprocess`, no `--jql`):
+
+```bash
+python3 scripts/snapshot_fetch.py fetch --reprocess --ids-file tmp/pipeline-all-ids.txt --changed-file tmp/pipeline-changed-ids.txt
+```
 
 **Explicit mode**:
 
@@ -50,15 +54,6 @@ bash scripts/bootstrap-assess-rfe.sh
 Retry once on failure. If retry fails, stop: "bootstrap failed."
 
 ### 4. Resume check + batch
-
-**Reprocess mode** (`--reprocess`): Skip resume check. Copy all IDs directly:
-
-```bash
-python3 scripts/state.py read-ids tmp/pipeline-all-ids.txt
-python3 scripts/state.py write-ids tmp/pipeline-process-ids.txt <all_IDs>
-```
-
-**Normal mode**:
 
 ```bash
 python3 scripts/check_resume.py --ids-file tmp/pipeline-all-ids.txt --changed-file tmp/pipeline-changed-ids.txt --output-file tmp/pipeline-process-ids.txt

@@ -11,7 +11,7 @@ You are a non-interactive RFE auto-fix pipeline. Do not ask questions or wait fo
 
 Parse `$ARGUMENTS` for:
 - `--jql "<query>"`, `--limit N`, `--batch-size N` (default 50), `--data-dir "<path>"`
-- `--headless`, `--announce-complete`
+- `--headless`, `--announce-complete`, `--reprocess`
 - Remaining arguments: explicit RFE IDs
 
 ### 1. Init
@@ -25,10 +25,16 @@ python3 scripts/pipeline_state.py init [--batch-size N] [--headless] [--announce
 **JQL mode** (`--jql`):
 
 ```bash
-python3 scripts/snapshot_fetch.py fetch "<query>" --ids-file tmp/pipeline-all-ids.txt --changed-file tmp/pipeline-changed-ids.txt [--limit N] [--data-dir "<path>"]
+python3 scripts/snapshot_fetch.py fetch "<query>" --ids-file tmp/pipeline-all-ids.txt --changed-file tmp/pipeline-changed-ids.txt [--limit N] [--data-dir "<path>"] [--reprocess]
 ```
 
 Print `[AUTOFIX] JQL: <jql>` from stderr output.
+
+**Reprocess mode** (`--reprocess`, no `--jql`):
+
+```bash
+python3 scripts/snapshot_fetch.py fetch --reprocess --ids-file tmp/pipeline-all-ids.txt --changed-file tmp/pipeline-changed-ids.txt
+```
 
 **Explicit mode**:
 
@@ -37,7 +43,7 @@ python3 scripts/state.py write-ids tmp/pipeline-all-ids.txt <IDs>
 python3 scripts/state.py write-ids tmp/pipeline-changed-ids.txt
 ```
 
-If no IDs and no JQL, stop with usage instructions.
+If no IDs and no JQL and not `--reprocess`, stop with usage instructions.
 
 ### 3. Bootstrap
 
@@ -79,13 +85,13 @@ Repeat until phase is `DONE`:
 python3 scripts/pipeline_state.py get-phase-config
 ```
 
-Parse YAML for: `type`, `command`, `prompt`, `ids_file`, `vars`, `poll_phase`, `post_verify`, `timeout`, `pre_script`, `subagent_type`, `parallel`.
+Parse YAML for: `type`, `prompt`, `ids_file`, `vars`, `poll_phase`, `post_verify`, `timeout`, `pre_script`, `subagent_type`, `parallel`.
 
 ### Step 2: Dispatch
 
 **noop**: Skip to advance.
 
-**script**: Run the `command` directly. If `ids_file` is set, read IDs from it and append as positional args.
+**script**: Run `python3 scripts/pipeline_state.py run-phase`.
 
 **agent**:
 

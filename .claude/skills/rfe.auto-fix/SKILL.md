@@ -28,9 +28,9 @@ python3 scripts/pipeline_state.py init [--batch-size N] [--headless] [--announce
 python3 scripts/snapshot_fetch.py fetch "<query>" --ids-file tmp/pipeline-all-ids.txt --changed-file tmp/pipeline-changed-ids.txt [--limit N] [--data-dir "<path>"] [--reprocess]
 ```
 
-Print `[AUTOFIX] JQL: <jql>` from stderr output.
+Print `[AUTOFIX] JQL: <jql>` from stderr output. Pass `--reprocess` if set.
 
-**Reprocess mode** (`--reprocess`, no `--jql`):
+**Reprocess-only mode** (`--reprocess` without `--jql`):
 
 ```bash
 python3 scripts/snapshot_fetch.py fetch --reprocess --ids-file tmp/pipeline-all-ids.txt --changed-file tmp/pipeline-changed-ids.txt

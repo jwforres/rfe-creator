@@ -109,12 +109,11 @@ Parse YAML for: `type`, `prompt`, `ids_file`, `vars`, `poll_phase`, `post_verify
    b. Poll until wave completes:
 
       ```bash
-      python3 scripts/check_review_progress.py --phase <poll_phase> [--fast-poll if not headless] <wave_IDs>
+      python3 scripts/check_review_progress.py --poll --phase <poll_phase> [--also-phase <p> for each parallel entry's poll_phase] [--fast-poll if not headless] --id-file <ids_file>
       ```
 
-      Parse `NEXT_POLL=` for sleep seconds. Stop when `PENDING=0`.
-
-      If `parallel` entries: also poll each entry's `poll_phase` separately. All polls must complete before the wave is done.
+      Blocks ~90s (sleeps internally), then exits 0 (done) or 3 (pending).
+      On exit 3, re-run the exact same command until exit 0 — this is a required retry, not polling.
 
 4. After all waves: if `post_verify` is set, run it.
 

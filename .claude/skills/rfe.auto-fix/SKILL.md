@@ -85,7 +85,7 @@ Repeat until phase is `DONE`:
 python3 scripts/pipeline_state.py get-phase-config
 ```
 
-Parse YAML for: `type`, `prompt`, `ids_file`, `vars`, `poll_phase`, `post_verify`, `timeout`, `pre_script`, `subagent_type`, `parallel`.
+Parse YAML for: `type`, `prompt`, `ids_file`, `vars`, `poll_phase`, `post_verify`, `pre_script`, `subagent_type`, `parallel`.
 
 ### Step 2: Dispatch
 
@@ -113,7 +113,6 @@ Parse YAML for: `type`, `prompt`, `ids_file`, `vars`, `poll_phase`, `post_verify
       ```
 
       Parse `NEXT_POLL=` for sleep seconds. Stop when `PENDING=0`.
-      If `timeout` seconds elapsed, stop waiting for this wave.
 
       If `parallel` entries: also poll each entry's `poll_phase` separately. All polls must complete before the wave is done.
 

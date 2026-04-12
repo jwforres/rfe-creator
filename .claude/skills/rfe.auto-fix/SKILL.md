@@ -109,9 +109,10 @@ Parse YAML for: `type`, `prompt`, `ids_file`, `vars`, `poll_phase`, `post_verify
    b. Wait for wave to complete:
 
       ```bash
-      python3 scripts/check_review_progress.py --wait --phase <poll_phase> [--also-phase <p> for each parallel entry's poll_phase] [--fast-poll if not headless] --id-file <ids_file>
+      python3 scripts/check_review_progress.py --wait --phase <poll_phase> [--also-phase <p> for each parallel entry's poll_phase] [--fast-poll if not headless] <wave_IDs>
       ```
 
+      Pass only the current wave's IDs (not all phase IDs).
       Blocks ~90s (sleeps internally), then exits 0 (done) or 3 (pending).
       On exit 3, re-run the exact same command until exit 0.
 

@@ -77,54 +77,54 @@ python3 scripts/pipeline_state.py set-phase BATCH_START
 
 ## Dispatch Loop
 
-Repeat until phase is `DONE`:
+Repeat until action is `done`:
 
-### Step 1: Read config
-
-```bash
-python3 scripts/pipeline_state.py get-phase-config
-```
-
-Parse YAML for: `type`, `prompt`, `ids_file`, `vars`, `poll_phase`, `post_verify`, `pre_script`, `subagent_type`, `parallel`.
-
-### Step 2: Dispatch
-
-**noop**: Skip to advance.
-
-**script**: Run `python3 scripts/pipeline_state.py run-phase`.
-
-**agent**:
-
-1. Read IDs from `ids_file`.
-2. Pre-filter already done: `python3 scripts/check_review_progress.py --phase <poll_phase> <IDs>` — remove COMPLETED IDs from the working set.
-3. Use `wave_size` from the phase config output. Process remaining IDs in waves of that size:
-
-   a. For each ID in the wave:
-      - If `pre_script`: run it with `{ID}` replaced by the current ID.
-      - Build the agent environment string from `vars`: for each key-value pair, replace `{ID}` with the current ID, producing lines like `ID=RHAIRFE-1234`, `ASSESS_PATH=/tmp/rfe-assess/single/RHAIRFE-1234.result.md`, etc.
-      - Launch a background Agent with `subagent_type` (if set). The prompt is:
-        `"<vars as KEY=VALUE lines>\n\nRead <prompt> and follow all instructions exactly."`
-      - If `parallel` entries exist: for each entry, launch one additional background Agent. If the entry has its own `vars`, build the env string from those (with `{ID}` replaced) — do NOT use the parent phase's `vars`. Use the entry's `subagent_type` if set. The prompt format is the same: `"<vars as KEY=VALUE lines>\n\nRead <entry's prompt> and follow all instructions exactly."`
-
-   b. Wait for wave to complete:
-
-      ```bash
-      python3 scripts/check_review_progress.py --wait --phase <poll_phase> [--also-phase <p> for each parallel entry's poll_phase] [--fast-poll if not headless] <wave_IDs>
-      ```
-
-      Pass only the current wave's IDs (not all phase IDs).
-      Blocks ~90s (sleeps internally), then exits 0 (done) or 3 (pending).
-      On exit 3, re-run the exact same command until exit 0.
-
-4. After all waves: if `post_verify` is set, run it.
-
-### Step 3: Advance
+### Step 1: Get next action
 
 ```bash
-python3 scripts/pipeline_state.py advance
+python3 scripts/pipeline_state.py next-action
 ```
 
-Print the transition summary. Loop back to step 1.
+Parse the YAML output for: `action`, `phase`, `message`, `agents`.
+
+### Step 2: Execute
+
+**done**: Exit loop. Run teardown.
+
+**run_script**: Run `python3 scripts/pipeline_state.py run-phase`. Go to step 1.
+
+**launch_wave**: For each agent in the `agents` list:
+- Build prompt: `"<vars>\n\nRead <prompt_file> and follow all instructions exactly."`
+- `vars` are pre-rendered KEY=VALUE lines with `{ID}` already substituted.
+- Launch as background Agent (with `subagent_type` if present).
+
+Then wait for completion:
+
+```bash
+python3 scripts/pipeline_state.py wait-for-wave
+```
+
+On exit 0 (complete): go to step 1.
+On exit 3 (still pending): re-run `python3 scripts/pipeline_state.py wait-for-wave`.
+Any other exit code is an error.
+
+### Example `launch_wave` output
+
+```yaml
+action: launch_wave
+phase: ASSESS
+message: "ASSESS: wave 1/2 (5 IDs)"
+agents:
+  - subagent_type: rfe-scorer
+    prompt_file: .claude/skills/rfe.review/prompts/assess-agent.md
+    vars: |
+      DATA_FILE=/tmp/rfe-assess/single/RHAIRFE-1234.md
+      RUN_DIR=/tmp/rfe-assess/single
+      PROMPT_PATH=.context/assess-rfe/scripts/agent_prompt.md
+  - prompt_file: .claude/skills/rfe-feasibility-review/SKILL.md
+    vars: |
+      ID=RHAIRFE-1234
+```
 
 ## Teardown
 

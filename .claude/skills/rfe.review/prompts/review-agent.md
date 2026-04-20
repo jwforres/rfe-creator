@@ -53,7 +53,7 @@ python3 scripts/frontmatter.py set artifacts/rfe-reviews/{ID}-review.md \
     scores.title_quality=<n or null>
 ```
 
-**Title Quality score**: Extract from the `Title Quality *(advisory)*` row in the assessment result table. This score is advisory only and is NOT included in the total score or pass/fail calculation (the total remains /10 from the 5 core criteria). If the `Title Quality *(advisory)*` row is missing from the assessment output (e.g., older assess-rfe version), set `scores.title_quality=null`.
+**Title Quality score**: Extract from any row whose name starts with `Title Quality` in the assessment result table (e.g., `Title Quality`, `Title Quality *(advisory)*`). This score is advisory only and is NOT included in the total score or pass/fail calculation (the total remains /10 from the 5 core criteria). If no `Title Quality` row is present in the assessment output (e.g., older assess-rfe version), set `scores.title_quality=null`.
 
 If first pass ({FIRST_PASS}=true), also set before_score and before_scores.* with the same values:
 

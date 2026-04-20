@@ -17,11 +17,11 @@ Parse `$ARGUMENTS` for:
 - `--batch-size N`: Override batch size (default 5), passed to auto-fix
 - Remaining arguments: either a single Jira key (RHAIRFE-NNNN) or a free-text idea
 
-Clean temp state and persist parsed flags:
+Clean temp state and persist parsed flags. `batch_size` MUST always be a concrete integer — if the user did not pass `--batch-size`, substitute the speedrun default of `5`. Do not write `<N>`, `null`, or omit the field.
 
 ```bash
 python3 scripts/state.py clean
-python3 scripts/state.py init tmp/speedrun-config.yaml headless=<true/false> announce_complete=<true/false> dry_run=<true/false> batch_size=<N> input_file=<path or null>
+python3 scripts/state.py init tmp/speedrun-config.yaml headless=<true/false> announce_complete=<true/false> dry_run=<true/false> batch_size=<N or 5> input_file=<path or null>
 ```
 
 Determine pipeline mode:
@@ -97,10 +97,10 @@ python3 scripts/state.py read-ids tmp/speedrun-all-ids.txt
 Build the auto-fix command using flags from the config file:
 
 ```
-/rfe.auto-fix [--headless] [--announce-complete] [--batch-size N] <all_IDs_from_file>
+/rfe.auto-fix [--headless] [--announce-complete] --batch-size <batch_size> <all_IDs_from_file>
 ```
 
-Pass `--headless` and `--announce-complete` through if set. Pass `--batch-size` if provided.
+Pass `--headless` and `--announce-complete` through if set in the config. **Always** pass `--batch-size <batch_size>` using the value from `tmp/speedrun-config.yaml` — never omit it, never let auto-fix's own default take over. The speedrun default (5) was already pinned in Step 0; relying on it here is what makes runs reproducible.
 
 Auto-fix handles: assessment, feasibility checks, review, auto-revision, re-assessment, splitting oversized RFEs, retry queue, and report generation. Wait for it to complete.
 

@@ -49,5 +49,10 @@ The scripts automatically apply labels based on what happened during the pipelin
 | `rfe-creator-split-result` | Child ticket produced by splitting another RFE |
 | `rfe-creator-needs-attention` | Automation couldn't fully resolve all issues — human review needed (review frontmatter `needs_attention: true`) |
 | `rfe-creator-autofix-rubric-pass` | RFE passed review (recommendation = "submit") — excluded from future auto-fix JQL queries |
+| `rfe-creator-feasibility-pass` | Technical feasibility check returned `feasible` |
+| `rfe-creator-feasibility-fail` | Technical feasibility check returned `infeasible` |
+| `rfe-creator-feasibility-unknown` | Technical feasibility check returned `indeterminate` |
+
+The three `rfe-creator-feasibility-*` labels are mutually exclusive: on each submit, the matching label is added and any others present in the ticket's `original_labels` are removed. Rejected RFEs have any feasibility labels stripped (no add).
 
 $ARGUMENTS
